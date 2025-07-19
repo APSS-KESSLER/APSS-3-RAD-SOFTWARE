@@ -26,10 +26,10 @@ const int cal_max = 1023;
 
 // Macro time constants
 #define TIMER_1MS_SMCLK 1000 // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000000 cycles = 1 s
-#define TACLR 0x0004 // Timer A clear bit
+#define TIMER0_B3_IVECTOR 0xFFF8 // Timer0_B3 Interrupt Vector Address
 
 // Volatile time variables
-volatile unsigned long g_interrupt_timer = 0;   
+volatile unsigned long interrupt_timer   = 0;   
 volatile unsigned long total_deadtime    = 0;    
 volatile unsigned long waiting_t1        = 0;    // Reserved for future use
 
@@ -53,20 +53,20 @@ uint8_t MASTER;
 uint8_t keep_pulse                       = 0;
 
 unsigned long millis(){
-    return g_interrupt_timer;
+    return interrupt_timer;
 }
 
 // Timer A0 ISR
 // Tells the compiler that the next function following the pragma is an ISR and needs an entry in the interrupt vector table.
-#pragma vector = TIMER0_A0_VECTOR
-__interrupt void TimerA0ISR(void) {
+#pragma vector = TIMER0_B3_IVECTOR
+__interrupt void Timer0_B3ISR(void) {
 
     // Increment ms counter
-    g_interrupt_timer++;
+    interrupt_timer++;
     
     // If interrupt state is HIGH, accumulate deadtime and reset waiting state to LOW
     if (waiting_for_interrupt == 1) {
-        total_deadtime += (g_interrupt_timer - waiting_t1);
+        total_deadtime += (interrupt_timer - waiting_t1);
     }
     waiting_for_interrupt = 0;
     
@@ -81,7 +81,9 @@ float getSipmVoltage(float adc_value) {
 
     // Calculate new voltage
     int cal_size = sizeof(cal) / sizeof(cal[0]);
-    for (int i = 0; i < cal_size; i++) {
+
+    unsigned int i = 0;
+    for (i = 0; i < cal_size; i++) {
         voltage += cal[i] * pow(adc_value, (cal_size - i - 1));
     }
 
@@ -133,7 +135,10 @@ void analogueWrite(unsigned int pin, unsigned int value) {
 
 // Delay function in ms
 void delay_ms(unsigned int ms) {
-    for (unsigned int i = 0; i < ms; i++) {
+
+    unsigned int i = 0;
+
+    for (i = 0; i < ms; i++) {
         __delay_cycles(1000); // For 1MHz SMCLK, 1000 cycles = 1ms
     }
 }
@@ -151,10 +156,10 @@ int main(void){
     ADCCTL2 = ADCRES_2;                         // 12-bit resolution
     ADCMCTL0 = ADCINCH_0;                       // Default to A0
 
-    // Timer A0 Setup for system timer
-    TA0CCR0 = TIMER_1MS_SMCLK - 1;              // 1ms interval
-    TA0CCTL0 = CCIE;                            // Enable interrupt for CCR0
-    TA0CTL = TASSEL__SMCLK | MC__UP | TACLR;    // use SMCLK, count up to TA0CCR0, and clear timer
+    // Timer0_B3 Setup for system timer
+    TB0CCR0 = TIMER_1MS_SMCLK -1;               // 1ms interval
+    TB0CCTL0 = CCIE;                            // ENable interrupt for CCR0
+    TB0CTL = TBSSEL_2 | MC_1 | TBCLR;           // use SMCLK, count up to TB0CCR0, and clear timer
 
     __enable_interrupt();                       // Enable global interrupts
 
