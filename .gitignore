@@ -1,0 +1,9 @@
+Debug/
+Release/
+*.o
+*.out
+*.map
+*.log
+*.launches/
+.metadata/
+targetConfigs/
