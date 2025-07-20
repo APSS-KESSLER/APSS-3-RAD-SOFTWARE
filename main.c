@@ -81,18 +81,17 @@ float getSipmVoltage(float adc_value) {
     // Calculate new voltage
     int cal_size = sizeof(cal) / sizeof(cal[0]);
 
+    // Horner's Method for power efficient calculations    
     unsigned int i = 0;
     for (i = 0; i < cal_size; i++) {
-
-        // ** TODO: replace pow() with horners method for greater efficiency **
-        voltage += cal[i] * pow(adc_value, (cal_size - i - 1));
+        voltage = voltage * adc_value + cal[i];
     }
 
     return voltage;
 }
 
-// Analogue reading function
-unsigned int analogueRead(unsigned int channel) {
+// Function to configure and read from an analogue pin
+unsigned int adcRead(unsigned int channel) {
    
     // Clear ADC function bits
     P5SEL0 &= ~(BIT0 | BIT1 | BIT2 | BIT3);
