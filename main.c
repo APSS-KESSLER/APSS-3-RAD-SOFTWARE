@@ -9,28 +9,20 @@
 
 #include <msp430fr2355.h>
 #include <stdint.h>
-#include <math.h>
 #include <stdio.h>
+
+// Macro time constants
+#define TIMER_1MS_SMCLK 1000 // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
 
 // Signal and LED constants
 const int SIGNAL_THRESHOLD = 50;  // Min threshold to trigger on. See calibration.pdf for conversion to mV
 const int RESET_THRESHOLD = 25;
 
-// Calibration fit data for 10k,10k,249,10pf; 20nF,100k,100k, 0,0,57.6k,  1 point
-const long double cal[] = {-9.085681659276021e-27, 4.6790804314609205e-23, -1.0317125207013292e-19,
-                           1.2741066484319192e-16, -9.684460759517656e-14, 4.6937937442284284e-11, -1.4553498837275352e-08,
-                           2.8216624998078298e-06, -0.000323032620672037, 0.019538631135788468, -0.3774384056850066, 12.324891083404246};
-
-const int cal_max = 1023;
-
-// Macro time constants
-#define TIMER_1MS_SMCLK 1000 // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
-#define TIMER0_B3_IVECTOR 0xFFF8 // Timer0_B3 Interrupt Vector Address
-
 // Volatile time variables
 volatile unsigned long interrupt_timer   = 0;   
 volatile unsigned long total_deadtime    = 0;    
 volatile unsigned long waiting_t1        = 0;    // Timestamp for deadtime calculation
+volatile uint32_t timer_overflows        = 0;    // Overflow counter for microseconds since program start
 
 // Non-volatile time variables
 unsigned long measurement_deadtime       = 0;
@@ -51,25 +43,77 @@ uint8_t SLAVE;
 uint8_t MASTER;
 uint8_t keep_pulse                       = 0;
 
-unsigned long millis(){
-    return interrupt_timer;
+// Calibration fit data for 10k,10k,249,10pf; 20nF,100k,100k, 0,0,57.6k,  1 point
+const long double cal[] = {-9.085681659276021e-27, 4.6790804314609205e-23, -1.0317125207013292e-19,
+                           1.2741066484319192e-16, -9.684460759517656e-14, 4.6937937442284284e-11, -1.4553498837275352e-08,
+                           2.8216624998078298e-06, -0.000323032620672037, 0.019538631135788468, -0.3774384056850066, 12.324891083404246};
+
+const int cal_max = 1023;
+
+// Initialise timer for microsecond counting
+void initMicroTimer() {
+
+    // Configure Clock Registers
+    __bis_SR_register(SCG0);                //Disable FLL
+    CSCTL1 = DCORSEL_0;                          // Set SMCLK to 1 MHz
+    CSCTL3 = DIVA__1 | DIVS__1 | DIVM__1;        // No dividers
+    __delay_cycles(3);                   // Small delay to allow time for reconfiguration
+    __bic_SR_register(SCG0);               //Enable FLL
+
+    // Timer B0 setup: continuous mode, SMCLK source, no divider
+    TB0CTL = TBSSEL_2 | MC_2 | TBCLR | TBIE; // SMCLK, Continuous mode, Clear, Interrupt enable
 }
 
-// Timer A0 ISR
-// Tells the compiler that the next function following the pragma is an ISR and needs an entry in the interrupt vector table.
-#pragma vector = TIMER0_B3_IVECTOR
-__interrupt void TimerB0ISR(void) {
+#pragma vector = TIMER0_B0_VECTOR
+__interrupt void Timer_B_ISR(void) {
 
-    // Increment ms counter
-    interrupt_timer++;
-    
-    // If interrupt state is HIGH, accumulate deadtime and reset waiting state to LOW
-    if (waiting_for_interrupt == 1) {
-        total_deadtime += (interrupt_timer - waiting_t1);
+    // If the pending interrupt is an overflow flag, increment overflows
+    if (TB0IV == TBIV__TBIFG) {
+        timer_overflows++;
+
+        if (waiting_for_interrupt == 1) {
+
+            // Combine overflows and TB0R into 32-bit timestamp
+            uint32_t current_time = (timer_overflows << 16) | TB0R;
+            total_deadtime += (current_time - waiting_t1);
+        }
+
+        waiting_for_interrupt = 0;
+
     }
+}
 
-    waiting_for_interrupt = 0;
-    TB0CCTL0 &= ~CCIFG; // Manually clear interrupt flag
+// Function to get a 32-bit timer count combining timer and overflow count
+// Overflow will occur every 71 minutes @ 1 MHz, Depending on timestamp requirements will need to find way to manage
+uint32_t micros() {
+
+    // Variables to hold successive readings of the timer register and overflow counter
+    uint16_t t1, t2;
+    uint32_t ovf1, ovf2;
+
+    // Loop until consistent readings are obtained, this handles the case where the timer overflows during the read
+    do {
+
+        // Take timer register and overflow counter readings
+        ovf1 = timer_overflows;
+        t1 = TB0R;
+        ovf2 = timer_overflows;
+        t2 = TB0R;
+
+    } while (ovf1 != ovf2 || t2 < t1); // Check for overflow during read
+
+    return (ovf2 << 16) | t2; // Combine overflow count and timer value
+}
+
+// Placeholder function for returning milliseconds since program start
+unsigned long millis(){
+   return micros() / 1000; 
+}
+
+// Placeholder function for marking the start of a timed interval
+void handleEvent() {
+    waiting_for_interrupt = 1;
+    waiting_t1 = micros();
 }
 
 // Fit Polynomial Model to SIPM Voltage
@@ -229,15 +273,13 @@ int main(void){
     // Configure the ADC
     ADCCTL0 &= ~ADCENC;                                         // Disable ADC to configure
     ADCCTL0 = ADCON | ADCSHT_2 | ADCMSC;
-    ADCCTL1 = ADCSHP;                                           // Use sampling timer
+    ADCCTL1 = ADCSHP | ADCDIV_7;                                // Use sampling timer, set ADC clock to MODCLK / 8
     ADCCTL2 &= ~(BIT5 | BIT4);                                  // Clear resolution bits
-    ADCCTL2 = ADCRES_2;                                         // 12-bit resolution
+    ADCCTL2 = ADCRES_2;                                         // 12-bit resolution ** TODO: find appropriate clock frequency for bit resolution **
     ADCMCTL0 = ADCINCH_0;                                       // Default to channel 0 (A0)
 
-    // Timer B0 Setup for system timer
-    TB0CCR0 = TIMER_1MS_SMCLK -1;               // 1ms interval
-    TB0CCTL0 = CCIE;                            // Enable interrupt for CCR0
-    TB0CTL = TBSSEL_2 | MC_1 | TBCLR;           // use SMCLK, count up to TB0CCR0, and clear timer
+    // // Timer B0 Setup for system timer
+    initMicroTimer();
 
     // Timer B1 Setup for LED PWM
     TB1CCR0 = TIMER_1MS_SMCLK -1;               // 1ms interval
@@ -251,5 +293,4 @@ int main(void){
         
 
     }
-
 }
