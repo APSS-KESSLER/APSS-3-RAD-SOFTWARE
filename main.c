@@ -50,9 +50,8 @@ const long double cal[] = {-9.085681659276021e-27, 4.6790804314609205e-23, -1.03
 
 const int cal_max = 1023;
 
-// Initialise timer for microsecond counting
-void initMicroTimer() {
-
+void initDcoFrequency() {
+    
     __bis_SR_register(SCG0);                   // disable FLL
     CSCTL3 |= SELREF__REFOCLK;                      // Set REFO as FLL reference source
     CSCTL0 = 0;                                     // clear DCO and MOD registers
@@ -68,16 +67,29 @@ void initMicroTimer() {
                                                     // default DCODIV as MCLK and SMCLK source
     CSCTL5 |= DIVM__1 | DIVS__2;                    // SMCLK = 1MHz, MCLK = 2MHz
 
-    // Timer B0 setup: continuous mode, SMCLK source, no divider
-    TB0CTL = TBSSEL_2 | MC_2 | TBCLR | TBIE; // SMCLK, Continuous mode, Clear, Interrupt enable
 }
 
+// Initialise timer for microsecond counting
+void initMicroTimer() {
+
+    TB0CTL = TBSSEL_2 | MC_2 | TBCLR | TBIE; // SMCLK, Continuous mode, Clear, Interrupt enable
+
+}
+
+// Initialise timer for millisecond counting
 void initMilliTimer() {
 
-    // Setup Timer 
     TB3CCR0 = TIMER_1MS_SMCLK -1;               // 1ms interval
     TB3CCTL0 = CCIE;                            // Enable interrupt for CCR0
-    TB3CTL = TBSSEL_2 | MC_1 | TBCLR;           // use SMCLK, count up to TB0CCR0, and clear timer
+    TB3CTL = TBSSEL_2 | MC_1 | TBCLR;           // use SMCLK, count up to TB3CCR0, and clear timer
+
+}
+
+// Initialise timer for LED PWM
+void initLedPwmTimer() {
+
+    TB1CCR0 = TIMER_1MS_SMCLK -1;               // 1ms interval
+    TB1CTL = TBSSEL_2 | MC_1 | TBCLR;           // SMCLK, Up mode, clear timer
 
 }
 
@@ -164,6 +176,19 @@ float getSipmVoltage(float adc_value) {
     }
 
     return voltage;
+}
+
+// Function to initialise ADC
+void initAdc() {
+
+    // Configure the ADC
+    ADCCTL0 &= ~ADCENC;                                         // Disable ADC to configure
+    ADCCTL0 = ADCON | ADCSHT_2 | ADCMSC;
+    ADCCTL1 = ADCSHP | ADCDIV_7;                                // Use sampling timer, set ADC clock to MODCLK / 8
+    ADCCTL2 &= ~(BIT5 | BIT4);                                  // Clear resolution bits
+    ADCCTL2 = ADCRES_2;                                         // 12-bit resolution ** TODO: find appropriate clock frequency for bit resolution **
+    ADCMCTL0 = ADCINCH_0;                                       // Default to channel 0 (A0)
+
 }
 
 // Function to configure and read from an analogue pin
@@ -302,13 +327,11 @@ int main(void){
     // previously configured port settings
     PM5CTL0 &= ~LOCKLPM5;
 
-    // Configure the ADC
-    ADCCTL0 &= ~ADCENC;                                         // Disable ADC to configure
-    ADCCTL0 = ADCON | ADCSHT_2 | ADCMSC;
-    ADCCTL1 = ADCSHP | ADCDIV_7;                                // Use sampling timer, set ADC clock to MODCLK / 8
-    ADCCTL2 &= ~(BIT5 | BIT4);                                  // Clear resolution bits
-    ADCCTL2 = ADCRES_2;                                         // 12-bit resolution ** TODO: find appropriate clock frequency for bit resolution **
-    ADCMCTL0 = ADCINCH_0;                                       // Default to channel 0 (A0)
+    // Initialise ADC
+    initAdc();
+
+    // Initialise DCO frequency for MCLK and SMCLK clocks
+    initDcoFrequency();
 
     // Timer B0 Setup for system timer (microseconds)
     initMicroTimer();
@@ -317,11 +340,10 @@ int main(void){
     initMilliTimer();
 
     // Timer B1 Setup for LED PWM
-    TB1CCR0 = TIMER_1MS_SMCLK -1;               // 1ms interval
-    TB1CTL = TBSSEL_2 | MC_1 | TBCLR;           // SMCLK, Up mode, clear timer
+    initLedPwmTimer()
 
-
-    __enable_interrupt();                       // Enable global interrupts
+    // Enable global interrupts
+    __enable_interrupt();
 
     // Main program loop (to be implemented)
     while(1) {
