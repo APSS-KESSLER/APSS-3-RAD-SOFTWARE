@@ -12,10 +12,10 @@
 #include <stdio.h>
 
 // Macro time constants
-#define TIMER_1MS_SMCLK 1000 // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
+#define TIMER_1MS_SMCLK 1000                     // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
 
 // Signal and LED constants
-const int SIGNAL_THRESHOLD = 50;  // Min threshold to trigger on. See calibration.pdf for conversion to mV
+const int SIGNAL_THRESHOLD = 50;                 // Min threshold to trigger on. See calibration.pdf for conversion to mV
 const int RESET_THRESHOLD = 25;
 
 // Volatile time variables
@@ -50,6 +50,7 @@ const long double cal[] = {-9.085681659276021e-27, 4.6790804314609205e-23, -1.03
 
 const int cal_max = 1023;
 
+// Function to initialise DCO frequency for MCLK and SMCLK clocks
 void initDcoFrequency() {
     
     __bis_SR_register(SCG0);                   // disable FLL
@@ -79,7 +80,7 @@ void initMicroTimer() {
 // Initialise timer for millisecond counting
 void initMilliTimer() {
 
-    TB3CCR0 = TIMER_1MS_SMCLK -1;               // 1ms interval
+    TB3CCR0 = TIMER_1MS_SMCLK - 1;               // 1ms interval
     TB3CCTL0 = CCIE;                            // Enable interrupt for CCR0
     TB3CTL = TBSSEL_2 | MC_1 | TBCLR;           // use SMCLK, count up to TB3CCR0, and clear timer
 
@@ -223,8 +224,8 @@ unsigned int adcRead(unsigned int channel) {
         case 3:
             P5SEL0 |= BIT3;
             P5SEL1 &= ~BIT3;
-        
             break;
+
         // Invalid input handling
         default:
             return 0;
@@ -239,6 +240,21 @@ unsigned int adcRead(unsigned int channel) {
     ADCCTL0 |= ADCENC | ADCSC;
     while (ADCCTL1 & ADCBUSY);              // Wait for conversion
     return ADCMEM0;                         // Return result
+}
+
+int gpioReadPin5(uint8_t pin) {
+    
+    if (pin > 3) return 0; // Prevent out-of-range access
+
+    // Clear analog mode to enable digital function
+    P5SEL0 &= ~(1 << pin);
+    P5SEL1 &= ~(1 << pin);
+
+    // Set as input
+    P5DIR &= ~(1 << pin);
+
+    // Read pin
+    return (P5IN & (1 << pin)) ? 1 : 0;
 }
 
 // Function to activate LED to visually confirm detector activity
@@ -317,6 +333,16 @@ void delay_ms(unsigned int ms) {
     }
 }
 
+// Function to initialise I2C Communication
+void initI2C() {
+
+    UCB0CTLW0 = UCSWRST;                      // Software reset enabled
+    UCB0CTLW0 |= UCMODE_3 | UCSYNC;           // I2C mode, sync mode
+    UCB0I2COA0 = SLAVE_ADDR | UCOAEN;         // Own Address and enable
+    UCB0CTLW0 &= ~UCSWRST;                    // clear reset register
+    UCB0IE |= UCRXIE + UCSTPIE;
+    
+}
 
 int main(void){
     
@@ -340,7 +366,7 @@ int main(void){
     initMilliTimer();
 
     // Timer B1 Setup for LED PWM
-    initLedPwmTimer()
+    initLedPwmTimer();
 
     // Enable global interrupts
     __enable_interrupt();
