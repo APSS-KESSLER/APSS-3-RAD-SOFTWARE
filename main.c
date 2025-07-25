@@ -1,7 +1,7 @@
 // **********************************************************
 // *                                                        *
 // *     Author: Chris Lawrence                             *
-// *     Date:   19/07/25                                   *
+// *     Date:   25/07/25                                   *
 // *                                                        *
 // *     Summary: MSP430 Code Adaptation of CosmicWatch     *
 // *                                                        *
@@ -11,30 +11,60 @@
 #include <stdint.h>
 #include <stdio.h>
 
-// Macro time constants
-#define TIMER_1MS_SMCLK 1000                     // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
+// Time constants
+#define TIMER_1MS_SMCLK               1000              // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
+#define TIMER_1US_SMCLK               1                 // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
+
+
+// I2C constants
+#define SLAVE_ADDR                    0x00              // TODO: Set I2C slave address (placeholder, not yet assigned)
+
+// Command identifiers for Slave device communication
+#define CMD_TYPE_0_SLAVE              0
+#define CMD_TYPE_1_SLAVE              1
+#define CMD_TYPE_2_SLAVE              2
+
+// Command identifiers for Master device communication
+#define CMD_TYPE_0_MASTER             3
+#define CMD_TYPE_1_MASTER             4
+#define CMD_TYPE_2_MASTER             5
+
+// Data lengths for each command type in bytes
+#define TYPE_0_LENGTH                 1
+#define TYPE_1_LENGTH                 2
+#define TYPE_2_LENGTH                 6
+
+#define MAX_BUFFER_SIZE               20                // Will require changing in future once requirements known
+
+// Buffers for data sent between master/slave
+uint8_t MasterType2 [TYPE_2_LENGTH] = {0};
+uint8_t MasterType1 [TYPE_1_LENGTH] = {0};
+uint8_t MasterType0 [TYPE_0_LENGTH] = {0};
+uint8_t SlaveType2 [TYPE_2_LENGTH] = {0};
+uint8_t SlaveType1 [TYPE_1_LENGTH] = {0};
+uint8_t SlaveType0 [TYPE_0_LENGTH] = {0};
 
 // Signal and LED constants
-const int SIGNAL_THRESHOLD = 50;                 // Min threshold to trigger on. See calibration.pdf for conversion to mV
+const int SIGNAL_THRESHOLD = 50;                        // Min threshold to trigger on. See calibration.pdf for conversion to mV
 const int RESET_THRESHOLD = 25;
 
 // Volatile time variables
 volatile unsigned long interrupt_timer   = 0;   
 volatile unsigned long total_deadtime    = 0;    
-volatile unsigned long waiting_t1        = 0;    // Timestamp for deadtime calculation
-volatile uint32_t timer_overflows        = 0;    // Overflow counter for microseconds since program start
+volatile unsigned long waiting_t1        = 0;           // Timestamp for deadtime calculation
+volatile uint32_t timer_overflows        = 0;           // Overflow counter for microseconds since program start
 
 // Non-volatile time variables
 unsigned long measurement_deadtime       = 0;
 unsigned long measurementT1;
-unsigned long measurementT2;                     // Reserved for future use
+unsigned long measurementT2;                            // Reserved for future use
 unsigned long time_stamp                 = 0;
-unsigned long start_time                 = 0;    // Reference time for all the time measurements
+unsigned long start_time                 = 0;           // Reference time for all the time measurements
 
 // Muon variables
 float sipm_voltage                       = 0;
-long int count                           = 0;    // A tally of the number of muon counts observed
-float last_sipm_voltage                  = 0;    // Reserved for future use
+long int count                           = 0;           // A tally of the number of muon counts observed
+float last_sipm_voltage                  = 0;           // Reserved for future use
 float temperatureC;
 
 // Flags and mode indicators for interrupt handling and device state
@@ -50,86 +80,109 @@ const long double cal[] = {-9.085681659276021e-27, 4.6790804314609205e-23, -1.03
 
 const int cal_max = 1023;
 
+//******************************************************************************
+// Initialisation Functions ****************************************************
+//******************************************************************************
+
 // Function to initialise DCO frequency for MCLK and SMCLK clocks
 void initDcoFrequency() {
     
-    __bis_SR_register(SCG0);                   // disable FLL
-    CSCTL3 |= SELREF__REFOCLK;                      // Set REFO as FLL reference source
-    CSCTL0 = 0;                                     // clear DCO and MOD registers
-    CSCTL1 &= ~(DCORSEL_7);                         // Clear DCO frequency select bits first
-    CSCTL1 |= DCORSEL_2;                            // Set DCO = 4MHz
-    CSCTL2 = FLLD_1 + 60;                           // DCODIV = 2MHz
+    __bis_SR_register(SCG0);                    // disable FLL
+    CSCTL3 |= SELREF__REFOCLK;                       // Set REFO as FLL reference source
+    CSCTL0 = 0;                                      // clear DCO and MOD registers
+    CSCTL1 &= ~(DCORSEL_7);                          // Clear DCO frequency select bits first
+    CSCTL1 |= DCORSEL_2;                             // Set DCO = 4MHz
+    CSCTL2 = FLLD_1 + 60;                            // DCODIV = 2MHz
     __delay_cycles(3);                          
-    __bic_SR_register(SCG0);                   // enable FLL
+    __bic_SR_register(SCG0);                    // enable FLL
 
-    while(CSCTL7 & (FLLUNLOCK0 | FLLUNLOCK1));      // Poll until FLL is locked
+    while(CSCTL7 & (FLLUNLOCK0 | FLLUNLOCK1));       // Poll until FLL is locked
 
-    CSCTL4 = SELMS__DCOCLKDIV | SELA__REFOCLK;      // set default REFO(~32768Hz) as ACLK source, ACLK = 32768Hz
-                                                    // default DCODIV as MCLK and SMCLK source
-    CSCTL5 |= DIVM__1 | DIVS__2;                    // SMCLK = 1MHz, MCLK = 2MHz
+    CSCTL4 = SELMS__DCOCLKDIV | SELA__REFOCLK;       // set default REFO(~32768Hz) as ACLK source, ACLK = 32768Hz
+                                                     // default DCODIV as MCLK and SMCLK source
+    CSCTL5 |= DIVM__1 | DIVS__2;                     // SMCLK = 1MHz, MCLK = 2MHz
 
 }
 
 // Initialise timer for microsecond counting
 void initMicroTimer() {
 
-    TB0CTL = TBSSEL_2 | MC_2 | TBCLR | TBIE; // SMCLK, Continuous mode, Clear, Interrupt enable
+    TB0CTL = TBSSEL_2 | MC_2 | TBCLR | TBIE;         // SMCLK, Continuous mode, Clear, Interrupt enable
 
 }
 
 // Initialise timer for millisecond counting
 void initMilliTimer() {
 
-    TB3CCR0 = TIMER_1MS_SMCLK - 1;               // 1ms interval
-    TB3CCTL0 = CCIE;                            // Enable interrupt for CCR0
-    TB3CTL = TBSSEL_2 | MC_1 | TBCLR;           // use SMCLK, count up to TB3CCR0, and clear timer
+    TB3CCR0 = TIMER_1MS_SMCLK - 1;                  // 1ms interval
+    TB3CCTL0 = CCIE;                                // Enable interrupt for CCR0
+    TB3CTL = TBSSEL_2 | MC_1 | TBCLR;               // use SMCLK, count up to TB3CCR0, and clear timer
 
 }
 
 // Initialise timer for LED PWM
 void initLedPwmTimer() {
 
-    TB1CCR0 = TIMER_1MS_SMCLK -1;               // 1ms interval
-    TB1CTL = TBSSEL_2 | MC_1 | TBCLR;           // SMCLK, Up mode, clear timer
+    TB1CCR0 = TIMER_1MS_SMCLK -1;                   // 1ms interval
+    TB1CTL = TBSSEL_2 | MC_1 | TBCLR;               // SMCLK, Up mode, clear timer
 
 }
 
-// Microsecond ISR
-#pragma vector = TIMER0_B1_VECTOR
-__interrupt void Timer_B_ISR(void) {
+// Function to initialise ADC
+void initAdc() {
 
-    // Switch statements to avoid undefined behaviour for other interrupt flags
-    switch (TB0IV) {
-
-        // Overflow flag case
-        case TBIV__TBIFG:
-
-            timer_overflows++; // Increment microseconds timer
-
-            // Increment system deadtime
-            if (waiting_for_interrupt == 1) {
-                uint32_t current_time = (timer_overflows << 16) | TB0R;
-                total_deadtime += (current_time - waiting_t1);
-            }
-
-            // Reset interrupt flag
-            waiting_for_interrupt = 0;
-            break;
-
-        // Invalid case handling
-        default:
-            break;
-}
-}
-
-// Millisecond ISR
-#pragma vector = TIMER3_B0_VECTOR
-__interrupt void TimerB3ISR(void) {
-
-    // Increment ms counter
-    interrupt_timer++;
+    // Configure the ADC
+    ADCCTL0 &= ~ADCENC;                             // Disable ADC to configure
+    ADCCTL0 = ADCON | ADCSHT_2 | ADCMSC;
+    ADCCTL1 = ADCSHP | ADCDIV_7;                    // Use sampling timer, set ADC clock to MODCLK / 8
+    ADCCTL2 &= ~(BIT5 | BIT4);                      // Clear resolution bits
+    ADCCTL2 = ADCRES_2;                             // 12-bit resolution ** TODO: find appropriate clock frequency for bit resolution **
+    ADCMCTL0 = ADCINCH_0;                           // Default to channel 0 (A0)
 
 }
+
+// Function to initialise I2C communication
+void initI2C() {
+
+    UCB0CTLW0 = UCSWRST;                           // Software reset enabled
+    UCB0CTLW0 |= UCMODE_3 | UCSYNC;                // I2C mode, sync mode
+    UCB0I2COA0 = SLAVE_ADDR | UCOAEN;              // Own Address and enable
+    UCB0CTLW0 &= ~UCSWRST;                         // clear reset register
+    UCB0IE |= UCRXIE + UCSTPIE;
+    
+}
+
+// Function to initialise SPI communication
+void initSPI() 
+{
+    //Clock Polarity: The inactive state is high
+    //MSB First, 8-bit, Master, 4-pin mode, Synchronous
+    UCB0CTLW0 = UCSWRST;                                // Put state machine in reset
+    UCB0CTLW0 |= UCCKPL | UCMSB | UCSYNC | UCMODE_2;    // 4-pin, 8-bit SPI Slave
+    UCB0CTLW0 &= ~UCSWRST;                              // Initialize USCI state machine
+    UCB0IE |= UCRXIE;                                   // Enable USCI0 RX interrupt
+
+}
+
+// Function to initialise all functionality
+void systemInit(void) {
+
+    WDTCTL = WDTPW | WDTHOLD;                     // Stop watchdog
+    PM5CTL0 &= ~LOCKLPM5;                         // Enable GPIO
+    initDcoFrequency();                           // Clock
+    initAdc();                                    // ADC
+    initMicroTimer();                             // Timer B0 for microseconds
+    initMilliTimer();                             // Timer B3 for milliseconds
+    initLedPwmTimer();                            // Timer B1 for LED PWM
+    initI2C();                                    // I2C setup
+    initSPI();
+    __enable_interrupt();                         // Enable global interrupts
+
+}
+
+//******************************************************************************
+// Timer Calls *****************************************************************
+//******************************************************************************
 
 // Function to return milliseconds since inception
 // Will overflow after approximately 49.7 days (2^32ms)
@@ -155,11 +208,19 @@ uint32_t micros() {
     return (ovf2 << 16) | t1; // Combine overflow count and timer value
 }
 
-// Placeholder function for marking the start of a timed interval
-void handleEvent() {
-    waiting_for_interrupt = 1;
-    waiting_t1 = micros();
+// Delay function in ms
+void delay_ms(unsigned int ms) {
+
+    unsigned int i = 0;
+
+    for (i = 0; i < ms; i++) {
+        __delay_cycles(1000); // For 1MHz SMCLK, 1000 cycles = 1ms
+    }
 }
+
+//******************************************************************************
+// Calculations  ***************************************************************
+//******************************************************************************
 
 // Fit Polynomial Model to SIPM Voltage
 float getSipmVoltage(float adc_value) {
@@ -179,18 +240,9 @@ float getSipmVoltage(float adc_value) {
     return voltage;
 }
 
-// Function to initialise ADC
-void initAdc() {
-
-    // Configure the ADC
-    ADCCTL0 &= ~ADCENC;                                         // Disable ADC to configure
-    ADCCTL0 = ADCON | ADCSHT_2 | ADCMSC;
-    ADCCTL1 = ADCSHP | ADCDIV_7;                                // Use sampling timer, set ADC clock to MODCLK / 8
-    ADCCTL2 &= ~(BIT5 | BIT4);                                  // Clear resolution bits
-    ADCCTL2 = ADCRES_2;                                         // 12-bit resolution ** TODO: find appropriate clock frequency for bit resolution **
-    ADCMCTL0 = ADCINCH_0;                                       // Default to channel 0 (A0)
-
-}
+//******************************************************************************
+// I/O  ************************************************************************
+//******************************************************************************
 
 // Function to configure and read from an analogue pin
 unsigned int adcRead(unsigned int channel) {
@@ -322,58 +374,84 @@ void ledDisable(uint8_t pin) {
     }
 }
 
+//******************************************************************************
+// SPI State Machine ***********************************************************
+//******************************************************************************
 
-// Delay function in ms
-void delay_ms(unsigned int ms) {
+typedef enum SPI_ModeEnum{
 
-    unsigned int i = 0;
+    IDLE_MODE,
+    TX_REG_ADDRESS_MODE,
+    RX_REG_ADDRESS_MODE,
+    TX_DATA_MODE,
+    RX_DATA_MODE,
+    TIMEOUT_MODE
 
-    for (i = 0; i < ms; i++) {
-        __delay_cycles(1000); // For 1MHz SMCLK, 1000 cycles = 1ms
-    }
+} SPI_Mode;
+
+//******************************************************************************
+// ISR's ***********************************************************************
+//******************************************************************************
+
+// Microsecond ISR
+#pragma vector = TIMER0_B1_VECTOR
+__interrupt void Timer_B_ISR(void) {
+
+    // Switch statements to avoid undefined behaviour for other interrupt flags
+    switch (TB0IV) {
+
+        // Overflow flag case
+        case TBIV__TBIFG:
+
+            timer_overflows++; // Increment microseconds timer
+
+            // Increment system deadtime
+            if (waiting_for_interrupt == 1) {
+                uint32_t current_time = (timer_overflows << 16) | TB0R;
+                total_deadtime += (current_time - waiting_t1);
+            }
+
+            // Reset interrupt flag
+            waiting_for_interrupt = 0;
+            break;
+
+        // Invalid case handling
+        default:
+            break;
+}
 }
 
-// Function to initialise I2C Communication
-void initI2C() {
+// Millisecond ISR
+#pragma vector = TIMER3_B0_VECTOR
+__interrupt void TimerB3ISR(void) {
 
-    UCB0CTLW0 = UCSWRST;                      // Software reset enabled
-    UCB0CTLW0 |= UCMODE_3 | UCSYNC;           // I2C mode, sync mode
-    UCB0I2COA0 = SLAVE_ADDR | UCOAEN;         // Own Address and enable
-    UCB0CTLW0 &= ~UCSWRST;                    // clear reset register
-    UCB0IE |= UCRXIE + UCSTPIE;
-    
+    // Increment ms counter
+    interrupt_timer++;
+
 }
+
+// Placeholder function for marking the start of a timed interval
+void handleEvent() {
+    waiting_for_interrupt = 1;
+    waiting_t1 = micros();
+}
+
 
 int main(void){
     
-    // Stop watchdog timer  
-    WDTCTL = WDTPW | WDTHOLD; 
+    // Initialise system
+    systemInit();
+
+    P1DIR |= BIT0 | BIT1;
+    P1OUT &= ~(BIT0 | BIT1);
+
+    uint32_t last = 0;
+    uint32_t last2 = 0;
+
+    // Main program loop (to be implemented)        
+    while (1) {
+
     
-    // Disable the GPIO power-on default high-impedance mode to activate
-    // previously configured port settings
-    PM5CTL0 &= ~LOCKLPM5;
-
-    // Initialise ADC
-    initAdc();
-
-    // Initialise DCO frequency for MCLK and SMCLK clocks
-    initDcoFrequency();
-
-    // Timer B0 Setup for system timer (microseconds)
-    initMicroTimer();
-
-    // Timer B3 setup for milliseconds timer 
-    initMilliTimer();
-
-    // Timer B1 Setup for LED PWM
-    initLedPwmTimer();
-
-    // Enable global interrupts
-    __enable_interrupt();
-
-    // Main program loop (to be implemented)
-    while(1) {
-        
-
     }
+    
 }
