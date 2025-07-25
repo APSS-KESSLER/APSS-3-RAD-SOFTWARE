@@ -390,6 +390,15 @@ typedef enum SPI_ModeEnum{
 
 } SPI_Mode;
 
+SPI_Mode SlaveMode = RX_REG_ADDRESS_MODE;           // Used to track the state of the software state machine
+uint8_t ReceiveRegAddr = 0;                         // Address will be assigned in the ISR
+uint8_t ReceiveBuffer[MAX_BUFFER_SIZE] = {0};       // Buffer used to receive data in the ISR
+uint8_t RXByteCtr = 0;                              // Number of bytes left to receive
+uint8_t ReceiveIndex = 0;                           // The index of the next byte to be received in ReceiveBuffer
+uint8_t TransmitBuffer[MAX_BUFFER_SIZE] = {0};      // Buffer used to transmit data in the ISR
+uint8_t TXByteCtr = 0;                              // Number of bytes left to transfer
+uint8_t TransmitIndex = 0;                          // The index of the next byte to be transmitted in TransmitBuffer    
+
 // Copies an array of bytes from source to destination
 void CopyArray(uint8_t *source, uint8_t *dest, uint8_t count) 
 {
@@ -474,7 +483,7 @@ void SPI_Slave_ProcessCMD(uint8_t cmd) {
 
             __no_operation();
             break;
-            
+
     }
 
 }
@@ -509,6 +518,73 @@ __interrupt void Timer_B_ISR(void) {
         default:
             break;
 }
+}
+
+// SPI ISR
+#pragma vector=USCI_B0_VECTOR
+__interrupt void USCI_B0_ISR(void) {
+
+    uint8_t ucb0_rx_val = 0;
+    switch(__even_in_range(UCB0IV, USCI_SPI_UCTXIFG))
+    {
+        case USCI_NONE: break;
+
+        case USCI_SPI_UCRXIFG:                                      // RX interrupt: received a byte
+            ucb0_rx_val = UCB0RXBUF;                                // Read received byte
+            UCB0IFG &= ~UCRXIFG;                                    // Clear RX flag
+
+            switch (SlaveMode) {
+
+                case (RX_REG_ADDRESS_MODE):                         // First byte: register/command address
+
+                    ReceiveRegAddr = ucb0_rx_val;
+                    SPI_Slave_ProcessCMD(ReceiveRegAddr);       // Set up next action
+                    break;
+
+                case (RX_DATA_MODE):                                // Receiving data payload
+
+                    ReceiveBuffer[ReceiveIndex++] = ucb0_rx_val;
+                    RXByteCtr--;
+
+                    if (RXByteCtr == 0) {                           // All bytes received
+
+                        SlaveMode = RX_REG_ADDRESS_MODE;            // Reset for next command
+                        SPI_Slave_TransactionDone(ReceiveRegAddr);
+
+                    }
+                    break;
+
+                case (TX_DATA_MODE):                                // Sending data to master
+
+                    if (TXByteCtr > 0) {                            // Send next byte if any remain
+
+                        SendUCB0Data(TransmitBuffer[TransmitIndex++]);
+                        TXByteCtr--;
+
+                    }
+                    if (TXByteCtr == 0) {                           // All bytes sent
+
+                        SlaveMode = RX_REG_ADDRESS_MODE;            // Reset for next command
+                        SPI_Slave_TransactionDone(ReceiveRegAddr);
+
+                    }
+                    break;
+
+                default:                                            // Invalid state
+
+                    __no_operation();
+                    break;
+
+                }
+            break;
+
+        case USCI_SPI_UCTXIFG:                                      // TX interrupt unused
+            break;
+
+        default: break;
+
+    }
+
 }
 
 // Millisecond ISR
