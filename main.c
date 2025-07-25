@@ -378,6 +378,7 @@ void ledDisable(uint8_t pin) {
 // SPI State Machine ***********************************************************
 //******************************************************************************
 
+// SPI operation modes for the slave device state machine.
 typedef enum SPI_ModeEnum{
 
     IDLE_MODE,
