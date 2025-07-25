@@ -488,6 +488,41 @@ void SPI_Slave_ProcessCMD(uint8_t cmd) {
 
 }
 
+// Finalises an SPI transaction based on the command type.
+// - For master-to-slave commands: copies received data into the appropriate MasterType buffer.
+// - For slave-to-master commands: no post-processing is needed.
+void SPI_Slave_TransactionDone(uint8_t cmd) {
+    switch (cmd) {
+
+        case (CMD_TYPE_0_SLAVE):
+            break;
+
+        case (CMD_TYPE_1_SLAVE):
+            break;
+
+        case (CMD_TYPE_2_SLAVE):
+            break;
+
+        case (CMD_TYPE_0_MASTER):
+            CopyArray(ReceiveBuffer, MasterType0, TYPE_0_LENGTH);
+            break;
+
+        case (CMD_TYPE_1_MASTER):
+            CopyArray(ReceiveBuffer, MasterType1, TYPE_1_LENGTH);
+            break;
+
+        case (CMD_TYPE_2_MASTER):
+            CopyArray(ReceiveBuffer, MasterType2, TYPE_2_LENGTH);
+            break;
+
+        default:
+            __no_operation();
+            break;
+
+    }
+}
+
+
 //******************************************************************************
 // ISR's ***********************************************************************
 //******************************************************************************
@@ -607,12 +642,6 @@ int main(void){
     
     // Initialise system
     systemInit();
-
-    P1DIR |= BIT0 | BIT1;
-    P1OUT &= ~(BIT0 | BIT1);
-
-    uint32_t last = 0;
-    uint32_t last2 = 0;
 
     // Main program loop (to be implemented)        
     while (1) {
