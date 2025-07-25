@@ -409,6 +409,76 @@ void SendUCB0Data(uint8_t val) {
 
 }
 
+
+// Processes incoming SPI commands and prepares data for transmission or reception
+// ** Note: commands from OBC are to be implemented once known **
+void SPI_Slave_ProcessCMD(uint8_t cmd) {
+
+    // Reset indexes and counters for a new transaction
+    ReceiveIndex = 0;
+    TransmitIndex = 0;
+    RXByteCtr = 0;
+    TXByteCtr = 0;
+
+    switch (cmd) {
+
+        // ==== MASTER REQUESTING DATA FROM SLAVE (SLAVE TRANSMITS) ====
+        case (CMD_TYPE_0_SLAVE):                        
+            SlaveMode = TX_DATA_MODE;
+            TXByteCtr = TYPE_0_LENGTH;
+            //Fill out the TransmitBuffer
+            CopyArray(SlaveType0, TransmitBuffer, TYPE_0_LENGTH);
+            //Send First Byte
+            SendUCB0Data(TransmitBuffer[TransmitIndex++]);
+            TXByteCtr--;
+            break;
+
+        case (CMD_TYPE_1_SLAVE):                      //Send slave device time (This device's time)
+            SlaveMode = TX_DATA_MODE;
+            TXByteCtr = TYPE_1_LENGTH;
+            //Fill out the TransmitBuffer
+            CopyArray(SlaveType1, TransmitBuffer, TYPE_1_LENGTH);
+            //Send First Byte
+            SendUCB0Data(TransmitBuffer[TransmitIndex++]);
+            TXByteCtr--;
+            break;
+
+        case (CMD_TYPE_2_SLAVE):                  //Send slave device location (This device's location)
+            SlaveMode = TX_DATA_MODE;
+            TXByteCtr = TYPE_2_LENGTH;
+            //Fill out the TransmitBuffer
+            CopyArray(SlaveType2, TransmitBuffer, TYPE_2_LENGTH);
+            //Send First Byte
+            SendUCB0Data(TransmitBuffer[TransmitIndex++]);
+            TXByteCtr--;
+            break;
+
+        // ==== MASTER SENDING DATA TO SLAVE (SLAVE RECEIVES) ====    
+        case (CMD_TYPE_0_MASTER):
+            SlaveMode = RX_DATA_MODE;
+            RXByteCtr = TYPE_0_LENGTH;
+            break;
+
+        case (CMD_TYPE_1_MASTER):
+            SlaveMode = RX_DATA_MODE;
+            RXByteCtr = TYPE_1_LENGTH;
+            break;
+
+        case (CMD_TYPE_2_MASTER):
+            SlaveMode = RX_DATA_MODE;
+            RXByteCtr = TYPE_2_LENGTH;
+            break;
+        
+        // Unknown command case
+        default:
+
+            __no_operation();
+            break;
+            
+    }
+
+}
+
 //******************************************************************************
 // ISR's ***********************************************************************
 //******************************************************************************
