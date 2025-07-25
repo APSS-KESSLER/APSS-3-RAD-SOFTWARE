@@ -390,6 +390,25 @@ typedef enum SPI_ModeEnum{
 
 } SPI_Mode;
 
+// Copies an array of bytes from source to destination
+void CopyArray(uint8_t *source, uint8_t *dest, uint8_t count) 
+{
+    uint8_t copyIndex = 0;
+    for (copyIndex = 0; copyIndex < count; copyIndex++)
+    {
+        dest[copyIndex] = source[copyIndex];
+    }
+
+}
+
+// Sends a single byte via UCB0 SPI (waits until TX buffer is ready)
+void SendUCB0Data(uint8_t val) {
+
+    while (!(UCB0IFG & UCTXIFG));              // USCI_B0 TX buffer ready?
+    UCB0TXBUF = val;
+
+}
+
 //******************************************************************************
 // ISR's ***********************************************************************
 //******************************************************************************
