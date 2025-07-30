@@ -152,15 +152,31 @@ void initI2C() {
     
 }
 
-// Function to initialise SPI communication
-void initSPI() 
-{
-    //Clock Polarity: The inactive state is high
-    //MSB First, 8-bit, Master, 4-pin mode, Synchronous
-    UCB0CTLW0 = UCSWRST;                                // Put state machine in reset
-    UCB0CTLW0 |= UCCKPL | UCMSB | UCSYNC | UCMODE_2;    // 4-pin, 8-bit SPI Slave
-    UCB0CTLW0 &= ~UCSWRST;                              // Initialize USCI state machine
-    UCB0IE |= UCRXIE;                                   // Enable USCI0 RX interrupt
+// Function to initialise SPI communcation with OBC
+void initSPI(void) {
+    
+    UCB0CTLW0 = UCSWRST;                           // Hold USCI in reset for configuration
+
+    // Configure: 4-wire SPI slave, MSB first
+    UCB0CTLW0 |= UCMSB | UCSYNC | UCMODE_2;        // 4-wire slave setup
+    UCB0CTLW0 |= UCCKPL | UCCKPH;                  // TODO: adjust SPI mode depending on what OBC uses (clock polarity and phase)
+    
+    // Configure pins
+    P1SEL0 |= BIT0 | BIT1 | BIT2 | BIT3;           // P1.0 = STE, P1.1=CLK, P1.2=SOMI, P1.3=SIMO
+    P1SEL1 &= ~(BIT0 | BIT1 | BIT2 | BIT3);
+
+    // Configure STE interrupt to detect transaction end
+    P2DIR &= ~BIT0;                                // STE as input
+    P2REN |= BIT0;                                 // Enable pull-up/down
+    P2IES &= ~BIT0;                                // Rising edge detect (STE going high = transaction end)
+    P2IFG &= ~BIT0;                                // Clear any pending
+    
+    UCB0IFG = 0;                                   // Clear interrupt flags 
+    UCB0TXBUF = 0x00;                              // Dummy byte
+    
+    UCB0CTLW0 &= ~UCSWRST;                         // Release USCI for operation
+    P2IE  |= BIT0;                                 // Enable interrupt for STE pin
+    UCB0IE |= UCRXIE;                              // Enable RX interrupt
 
 }
 
@@ -307,71 +323,6 @@ int gpioReadPin5(uint8_t pin) {
 
     // Read pin
     return (P5IN & (1 << pin)) ? 1 : 0;
-}
-
-// Function to activate LED to visually confirm detector activity
-void ledEnable(uint8_t pin) {
-    
-    TB1CCR0 = TIMER_1MS_SMCLK-1;        // PWM Period of 1ms
-
-    // Switch to different LED
-    switch(pin) {
-        
-        // P2.0 = TB1.1
-        case 0:
-            P2DIR |= BIT0;              // Set pin 2.0 as output
-            P2SEL0 |= BIT0;             // Assign to primary module function
-
-            TB1CCTL1 = OUTMOD_7;        // CCR1 reset/set
-            TB1CCR1 = 750;              // CCR1 PWM duty cycle
-            break;
-
-        // P2.1 = TB1.2
-        case 1:
-            P2DIR |= BIT1;              // Set pin 2.1 as output
-            P2SEL0 |= BIT1;             // Assign to primary module function
-
-            TB1CCTL2 = OUTMOD_7;        // CCR2 reset/set
-            TB1CCR2 = 250;              // CCR2 PWM duty cycle
-            break;
-
-        // Invalid input handling
-        default:
-            break;
-    }
-}
-
-// Function to deactivate LED after a detector event has occured
-void ledDisable(uint8_t pin) {
-
-    switch(pin) {
-
-        // Disable Timer B1 Capture/Compare 1 output mode
-        case 0:
-            TB1CCTL1 &= ~OUTMOD_7; // Clear the OUTMOD bits for CCR1
-
-            P2SEL0 &= ~BIT0;       // Revert P2.0 from primary module function to GPIO
-            P2DIR &= ~BIT0;        // Set P2.0 as high impedance input
-
-            // Consider adding a pull-up or pull-down resistor to prevent floating input
-            // Final decision depends on the PCB design and intended pin behavior
-            break;
-
-        // Disable Timer B1 Capture/Compare 2 output mode
-        case 1:
-            TB1CCTL2 &= ~OUTMOD_7; // Clear the OUTMOD bits for CCR2
-
-            P2SEL0 &= ~BIT1;       // Revert P2.1 from primary module function to GPIO
-            P2DIR &= ~BIT1;        // Set P2.1 as high impedance input 
-
-            // Consider adding a pull-up or pull-down resistor to prevent floating input
-            // Final decision depends on the PCB design and intended pin behavior
-            break;
-
-        // Invalid input handling
-        default:
-            break;
-    }
 }
 
 //******************************************************************************
@@ -630,13 +581,6 @@ __interrupt void TimerB3ISR(void) {
     interrupt_timer++;
 
 }
-
-// Placeholder function for marking the start of a timed interval
-void handleEvent() {
-    waiting_for_interrupt = 1;
-    waiting_t1 = micros();
-}
-
 
 int main(void){
     
