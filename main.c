@@ -330,25 +330,23 @@ int gpioReadPin5(uint8_t pin) {
 //******************************************************************************
 
 // SPI operation modes for the slave device state machine.
-typedef enum SPI_ModeEnum{
+typedef enum {
+    WAIT_FOR_START,
+    READ_QUERY,
+    READ_SUBQUERY,
+    READ_LENGTH,
+    READ_DATA
+} SPI_PacketState;
 
-    IDLE_MODE,
-    TX_REG_ADDRESS_MODE,
-    RX_REG_ADDRESS_MODE,
-    TX_DATA_MODE,
-    RX_DATA_MODE,
-    TIMEOUT_MODE
-
-} SPI_Mode;
-
-SPI_Mode SlaveMode = RX_REG_ADDRESS_MODE;           // Used to track the state of the software state machine
-uint8_t ReceiveRegAddr = 0;                         // Address will be assigned in the ISR
-uint8_t ReceiveBuffer[MAX_BUFFER_SIZE] = {0};       // Buffer used to receive data in the ISR
-uint8_t RXByteCtr = 0;                              // Number of bytes left to receive
-uint8_t ReceiveIndex = 0;                           // The index of the next byte to be received in ReceiveBuffer
-uint8_t TransmitBuffer[MAX_BUFFER_SIZE] = {0};      // Buffer used to transmit data in the ISR
-uint8_t TXByteCtr = 0;                              // Number of bytes left to transfer
-uint8_t TransmitIndex = 0;                          // The index of the next byte to be transmitted in TransmitBuffer    
+// Variables for data transfer
+volatile SPI_PacketState spi_state = WAIT_FOR_START;
+volatile uint8_t spi_rx_buffer[MAX_BUFFER_SIZE];
+volatile uint8_t spi_tx_buffer[MAX_BUFFER_SIZE];
+volatile uint8_t rx_index = 0;
+volatile uint8_t expected_length = 0;
+volatile uint8_t tx_length = 0;
+volatile uint8_t tx_index = 0;
+volatile uint8_t packet_ready = 0;
 
 // Copies an array of bytes from source to destination
 void CopyArray(uint8_t *source, uint8_t *dest, uint8_t count) 
@@ -507,70 +505,84 @@ __interrupt void Timer_B_ISR(void) {
 }
 
 // SPI ISR
-#pragma vector=USCI_B0_VECTOR
+#pragma vector = USCI_B0_VECTOR
 __interrupt void USCI_B0_ISR(void) {
 
-    uint8_t ucb0_rx_val = 0;
-    switch(__even_in_range(UCB0IV, USCI_SPI_UCTXIFG))
-    {
-        case USCI_NONE: break;
+    switch(__even_in_range(UCB0IV, USCI_SPI_UCTXIFG)) {
 
-        case USCI_SPI_UCRXIFG:                                      // RX interrupt: received a byte
-            ucb0_rx_val = UCB0RXBUF;                                // Read received byte
-            UCB0IFG &= ~UCRXIFG;                                    // Clear RX flag
+        case USCI_NONE: 
+        break;
 
-            switch (SlaveMode) {
+        // RX interrupt, new byte being recieved
+        case USCI_SPI_UCRXIFG: {
 
-                case (RX_REG_ADDRESS_MODE):                         // First byte: register/command address
+            // Read byte in RX buffer
+            uint8_t byte = UCB0RXBUF;
 
-                    ReceiveRegAddr = ucb0_rx_val;
-                    SPI_Slave_ProcessCMD(ReceiveRegAddr);       // Set up next action
-                    break;
-
-                case (RX_DATA_MODE):                                // Receiving data payload
-
-                    ReceiveBuffer[ReceiveIndex++] = ucb0_rx_val;
-                    RXByteCtr--;
-
-                    if (RXByteCtr == 0) {                           // All bytes received
-
-                        SlaveMode = RX_REG_ADDRESS_MODE;            // Reset for next command
-                        SPI_Slave_TransactionDone(ReceiveRegAddr);
-
+            // SPI state machine for assembling incoming packet
+            switch (spi_state) {
+                
+                // Start of new packet: reset index, store start byte, move to next state
+                case WAIT_FOR_START:
+                    if (byte == 0xD8) {  
+                        rx_index = 0;
+                        spi_rx_buffer[rx_index++] = byte;
+                        spi_state = READ_QUERY;
                     }
                     break;
 
-                case (TX_DATA_MODE):                                // Sending data to master
+                // Store query byte in buffer and advance index
+                case READ_QUERY:
+                    spi_rx_buffer[rx_index++] = byte;
+                    spi_state = READ_SUBQUERY;
+                    break;
 
-                    if (TXByteCtr > 0) {                            // Send next byte if any remain
+                // Store sub-query byte in buffer and advance index
+                case READ_SUBQUERY:
+                    spi_rx_buffer[rx_index++] = byte;
+                    spi_state = READ_LENGTH;
+                    break;
 
-                        SendUCB0Data(TransmitBuffer[TransmitIndex++]);
-                        TXByteCtr--;
+                // Store length byte in buffer and advance index
+                case READ_LENGTH:
+                    spi_rx_buffer[rx_index++] = byte;
+                    expected_length = byte;
 
-                    }
-                    if (TXByteCtr == 0) {                           // All bytes sent
+                    // Check for a valid length
+                    if (expected_length > MAX_BUFFER_SIZE - 4) {
+                        spi_state = WAIT_FOR_START;
+                    } else if (expected_length == 0) {
+                        packet_ready = 1;
+                        spi_state = WAIT_FOR_START;
 
-                        SlaveMode = RX_REG_ADDRESS_MODE;            // Reset for next command
-                        SPI_Slave_TransactionDone(ReceiveRegAddr);
-
+                    // If length is valid proceed to reading
+                    } else {
+                        spi_state = READ_DATA;
                     }
                     break;
 
-                default:                                            // Invalid state
+                // Store data byte in buffer and advance index
+                case READ_DATA:
+                    spi_rx_buffer[rx_index++] = byte;
 
-                    __no_operation();
+                    // All expected bytes received, packet is now ready for processing
+                    if (--expected_length == 0) {
+                        packet_ready = 1;
+                        spi_state = WAIT_FOR_START;
+                    }
                     break;
+            }
 
-                }
+            // Transmit next response byte, or send dummy byte (0x00) if none left
+            if (tx_index < tx_length) {
+                UCB0TXBUF = spi_tx_buffer[tx_index++];
+            } else {
+                UCB0TXBUF = 0x00;
+            }
             break;
-
-        case USCI_SPI_UCTXIFG:                                      // TX interrupt unused
-            break;
-
+        }
         default: break;
-
     }
-
 }
 
 // Millisecond ISR
