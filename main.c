@@ -585,6 +585,19 @@ __interrupt void USCI_B0_ISR(void) {
     }
 }
 
+// STE Pin ISR for resetting at end of transaction
+#pragma vector=PORT1_VECTOR
+__interrupt void PORT1_ISR(void) {
+    if (P1IFG & BIT0) {     
+        if (P1IN & BIT0) { // STE went high (end of transaction)
+            spi_state = WAIT_FOR_START;
+            rx_index = 0;
+            expected_length = 0;
+        }
+        P1IFG &= ~BIT0; // Clear interrupt flag for P1.0
+    }
+}
+
 // Millisecond ISR
 #pragma vector = TIMER3_B0_VECTOR
 __interrupt void TimerB3ISR(void) {
