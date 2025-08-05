@@ -1,7 +1,7 @@
 // **********************************************************
 // *                                                        *
 // *     Author: Chris Lawrence                             *
-// *     Date:   25/07/25                                   *
+// *     Date:   31/07/25                                   *
 // *                                                        *
 // *     Summary: MSP430 Code Adaptation of CosmicWatch     *
 // *                                                        *
@@ -73,13 +73,6 @@ uint8_t SLAVE;
 uint8_t MASTER;
 uint8_t keep_pulse                       = 0;
 
-// Calibration fit data for 10k,10k,249,10pf; 20nF,100k,100k, 0,0,57.6k,  1 point
-const long double cal[] = {-9.085681659276021e-27, 4.6790804314609205e-23, -1.0317125207013292e-19,
-                           1.2741066484319192e-16, -9.684460759517656e-14, 4.6937937442284284e-11, -1.4553498837275352e-08,
-                           2.8216624998078298e-06, -0.000323032620672037, 0.019538631135788468, -0.3774384056850066, 12.324891083404246};
-
-const int cal_max = 1023;
-
 //******************************************************************************
 // Initialisation Functions ****************************************************
 //******************************************************************************
@@ -117,14 +110,6 @@ void initMilliTimer() {
     TB3CCR0 = TIMER_1MS_SMCLK - 1;                  // 1ms interval
     TB3CCTL0 = CCIE;                                // Enable interrupt for CCR0
     TB3CTL = TBSSEL_2 | MC_1 | TBCLR;               // use SMCLK, count up to TB3CCR0, and clear timer
-
-}
-
-// Initialise timer for LED PWM
-void initLedPwmTimer() {
-
-    TB1CCR0 = TIMER_1MS_SMCLK -1;                   // 1ms interval
-    TB1CTL = TBSSEL_2 | MC_1 | TBCLR;               // SMCLK, Up mode, clear timer
 
 }
 
@@ -189,10 +174,63 @@ void systemInit(void) {
     initAdc();                                    // ADC
     initMicroTimer();                             // Timer B0 for microseconds
     initMilliTimer();                             // Timer B3 for milliseconds
-    initLedPwmTimer();                            // Timer B1 for LED PWM
     initI2C();                                    // I2C setup
     initSPI();
     __enable_interrupt();                         // Enable global interrupts
+
+}
+
+//******************************************************************************
+// Pin Config Functions ********************************************************
+//******************************************************************************
+
+// States for pin 1.4
+typedef enum {
+    GPIO_14,
+    A4,
+    UCA0STE,
+    TCK,
+} pin_state14;
+
+// States for pin 1.5
+typedef enum {
+    GPIO_15,
+    A5,
+    UCA0CLK,
+    TMS
+} pin_state15;
+
+// States for pin 1.6
+typedef enum {
+    GPIO_16,
+    A6,
+    UCA0RX,
+    MISO,
+    TDL
+} pin_state16;
+
+// States for pin 1.7
+typedef enum {
+    GPIO_17,
+    A7,
+    UCA0TX,
+    MOSI,
+    TDO
+} pin_state17;
+
+void configurePin1_4(){
+
+}
+
+void configurePin1_5(){
+
+}
+
+void configurePin1_6(){
+
+}
+
+void configurePin1_7(){
 
 }
 
@@ -222,38 +260,6 @@ uint32_t micros() {
     } while (ovf1 != ovf2);
 
     return (ovf2 << 16) | t1; // Combine overflow count and timer value
-}
-
-// Delay function in ms
-void delay_ms(unsigned int ms) {
-
-    unsigned int i = 0;
-
-    for (i = 0; i < ms; i++) {
-        __delay_cycles(1000); // For 1MHz SMCLK, 1000 cycles = 1ms
-    }
-}
-
-//******************************************************************************
-// Calculations  ***************************************************************
-//******************************************************************************
-
-// Fit Polynomial Model to SIPM Voltage
-float getSipmVoltage(float adc_value) {
-    
-    // Reset voltage variable
-    float voltage = 0;
-
-    // Calculate new voltage
-    int cal_size = sizeof(cal) / sizeof(cal[0]);
-
-    // Horner's Method for power efficient calculations    
-    unsigned int i = 0;
-    for (i = 0; i < cal_size; i++) {
-        voltage = voltage * adc_value + cal[i];
-    }
-
-    return voltage;
 }
 
 //******************************************************************************
@@ -348,129 +354,22 @@ volatile uint8_t tx_length = 0;
 volatile uint8_t tx_index = 0;
 volatile uint8_t packet_ready = 0;
 
-// Copies an array of bytes from source to destination
-void CopyArray(uint8_t *source, uint8_t *dest, uint8_t count) 
-{
-    uint8_t copyIndex = 0;
-    for (copyIndex = 0; copyIndex < count; copyIndex++)
-    {
-        dest[copyIndex] = source[copyIndex];
-    }
+// ===== Process Packet =====
+void process_spi_packet(uint8_t *packet, uint8_t length) {
+    uint8_t query_code = packet[1];
+    uint8_t sub_code   = packet[2];
+    uint8_t payload_len = packet[3];
+    uint8_t *payload = &packet[4];
 
+    // Build a simple echo response
+    spi_tx_buffer[0] = 0xD8;
+    spi_tx_buffer[1] = query_code | 0x80;  // Response code (echo + 0x80)
+    spi_tx_buffer[2] = 1;                  // Response length
+    spi_tx_buffer[3] = 0xAA;               // Dummy payload
+
+    tx_length = 4;    // Header + payload
+    tx_index = 0;
 }
-
-// Sends a single byte via UCB0 SPI (waits until TX buffer is ready)
-void SendUCB0Data(uint8_t val) {
-
-    while (!(UCB0IFG & UCTXIFG));              // USCI_B0 TX buffer ready?
-    UCB0TXBUF = val;
-
-}
-
-
-// Processes incoming SPI commands and prepares data for transmission or reception
-// ** Note: commands from OBC are to be implemented once known **
-void SPI_Slave_ProcessCMD(uint8_t cmd) {
-
-    // Reset indexes and counters for a new transaction
-    ReceiveIndex = 0;
-    TransmitIndex = 0;
-    RXByteCtr = 0;
-    TXByteCtr = 0;
-
-    switch (cmd) {
-
-        // ==== MASTER REQUESTING DATA FROM SLAVE (SLAVE TRANSMITS) ====
-        case (CMD_TYPE_0_SLAVE):                        
-            SlaveMode = TX_DATA_MODE;
-            TXByteCtr = TYPE_0_LENGTH;
-            //Fill out the TransmitBuffer
-            CopyArray(SlaveType0, TransmitBuffer, TYPE_0_LENGTH);
-            //Send First Byte
-            SendUCB0Data(TransmitBuffer[TransmitIndex++]);
-            TXByteCtr--;
-            break;
-
-        case (CMD_TYPE_1_SLAVE):                      //Send slave device time (This device's time)
-            SlaveMode = TX_DATA_MODE;
-            TXByteCtr = TYPE_1_LENGTH;
-            //Fill out the TransmitBuffer
-            CopyArray(SlaveType1, TransmitBuffer, TYPE_1_LENGTH);
-            //Send First Byte
-            SendUCB0Data(TransmitBuffer[TransmitIndex++]);
-            TXByteCtr--;
-            break;
-
-        case (CMD_TYPE_2_SLAVE):                  //Send slave device location (This device's location)
-            SlaveMode = TX_DATA_MODE;
-            TXByteCtr = TYPE_2_LENGTH;
-            //Fill out the TransmitBuffer
-            CopyArray(SlaveType2, TransmitBuffer, TYPE_2_LENGTH);
-            //Send First Byte
-            SendUCB0Data(TransmitBuffer[TransmitIndex++]);
-            TXByteCtr--;
-            break;
-
-        // ==== MASTER SENDING DATA TO SLAVE (SLAVE RECEIVES) ====    
-        case (CMD_TYPE_0_MASTER):
-            SlaveMode = RX_DATA_MODE;
-            RXByteCtr = TYPE_0_LENGTH;
-            break;
-
-        case (CMD_TYPE_1_MASTER):
-            SlaveMode = RX_DATA_MODE;
-            RXByteCtr = TYPE_1_LENGTH;
-            break;
-
-        case (CMD_TYPE_2_MASTER):
-            SlaveMode = RX_DATA_MODE;
-            RXByteCtr = TYPE_2_LENGTH;
-            break;
-        
-        // Unknown command case
-        default:
-
-            __no_operation();
-            break;
-
-    }
-
-}
-
-// Finalises an SPI transaction based on the command type.
-// - For master-to-slave commands: copies received data into the appropriate MasterType buffer.
-// - For slave-to-master commands: no post-processing is needed.
-void SPI_Slave_TransactionDone(uint8_t cmd) {
-    switch (cmd) {
-
-        case (CMD_TYPE_0_SLAVE):
-            break;
-
-        case (CMD_TYPE_1_SLAVE):
-            break;
-
-        case (CMD_TYPE_2_SLAVE):
-            break;
-
-        case (CMD_TYPE_0_MASTER):
-            CopyArray(ReceiveBuffer, MasterType0, TYPE_0_LENGTH);
-            break;
-
-        case (CMD_TYPE_1_MASTER):
-            CopyArray(ReceiveBuffer, MasterType1, TYPE_1_LENGTH);
-            break;
-
-        case (CMD_TYPE_2_MASTER):
-            CopyArray(ReceiveBuffer, MasterType2, TYPE_2_LENGTH);
-            break;
-
-        default:
-            __no_operation();
-            break;
-
-    }
-}
-
 
 //******************************************************************************
 // ISR's ***********************************************************************
@@ -615,6 +514,7 @@ int main(void){
     // Main program loop (to be implemented)        
     while (1) {
 
+        
     
     }
     
