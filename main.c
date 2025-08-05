@@ -77,6 +77,13 @@ uint8_t keep_pulse                       = 0;
 // Initialisation Functions ****************************************************
 //******************************************************************************
 
+// Function to perform pin setup routine for configuration
+void initPins(){
+
+    
+
+}
+
 // Function to initialise DCO frequency for MCLK and SMCLK clocks
 void initDcoFrequency() {
     
@@ -165,28 +172,14 @@ void initSPI(void) {
 
 }
 
-// Function to initialise all functionality
-void systemInit(void) {
-
-    WDTCTL = WDTPW | WDTHOLD;                     // Stop watchdog
-    PM5CTL0 &= ~LOCKLPM5;                         // Enable GPIO
-    initDcoFrequency();                           // Clock
-    initAdc();                                    // ADC
-    initMicroTimer();                             // Timer B0 for microseconds
-    initMilliTimer();                             // Timer B3 for milliseconds
-    initI2C();                                    // I2C setup
-    initSPI();
-    __enable_interrupt();                         // Enable global interrupts
-
-}
-
 //******************************************************************************
 // Pin Config Functions ********************************************************
 //******************************************************************************
 
 // States for pin 1.4
 typedef enum {
-    GPIO_14,
+    GPIO_14in,
+    GPIO_14out,
     A4,
     UCA0STE,
     TCK,
@@ -194,7 +187,8 @@ typedef enum {
 
 // States for pin 1.5
 typedef enum {
-    GPIO_15,
+    GPIO_15in,
+    GPIO_15out,
     A5,
     UCA0CLK,
     TMS
@@ -202,7 +196,8 @@ typedef enum {
 
 // States for pin 1.6
 typedef enum {
-    GPIO_16,
+    GPIO_16in,
+    GPIO_16out,
     A6,
     UCA0RX,
     MISO,
@@ -211,26 +206,115 @@ typedef enum {
 
 // States for pin 1.7
 typedef enum {
-    GPIO_17,
+    GPIO_17in,
+    GPIO_17out,
     A7,
     UCA0TX,
     MOSI,
     TDO
 } pin_state17;
 
-void configurePin1_4(){
+void configurePin1_4(unsigned int config){
+
+    // Reset all pins in the port
+    P1SEL0 &= ~BIT4;
+    P1SEL1 &= ~BIT4;
+    P1DIR &= ~BIT4;
+    P1REN &= ~BIT4;
+    P1OUT &= ~BIT4;
+
+    switch(config){
+
+        case GPIO_14in:
+            P1DIR &= ~BIT4;     // Configured as input
+            P1REN |= BIT4;      // Enable internal resistor
+            P1OUT |= BIT4;      // Select pullup resistor
+            break;
+
+        case GPIO_14out:       
+            P1DIR |= BIT4;      // Configured as output
+            P1OUT |= BIT4;      // Set output mode to HIGH
+            break;
+
+        case A4:
+            P1SEL0 |= BIT4;     // Select Bits for analog function
+            P1SEL1 |= BIT4;
+            break;
+
+        case UCA0STE:
+            P1SEL0 |= BIT4;
+            P1SEL1 &= ~BIT4;    
+            break;
+
+    }
 
 }
 
-void configurePin1_5(){
+void configurePin1_5(unsigned int config){
+
+    switch(config){
+
+        case GPIO_15in:
+
+
+        case GPIO_15out:       
+  
+
+        case A5:
+
+
+        case UCA0CLK:
+
+
+        case TMS:
+
+
+    }
 
 }
 
-void configurePin1_6(){
+void configurePin1_6(unsigned int config){
+
+    switch(config){
+
+        case GPIO_15:
+
+
+        case A5:
+
+
+        case UCA0RX:
+
+
+        case MISO:
+
+
+        case TDL:
+
+
+    }
 
 }
 
-void configurePin1_7(){
+void configurePin1_7(unsigned int config){
+
+    switch(config){
+
+        case GPIO_17:
+
+
+        case A7:
+
+
+        case UCA0TX:
+
+
+        case MOSI:
+
+
+        case TDO:
+
+    }
 
 }
 
@@ -509,7 +593,20 @@ __interrupt void TimerB3ISR(void) {
 int main(void){
     
     // Initialise system
-    systemInit();
+    WDTCTL = WDTPW | WDTHOLD;                     // Stop watchdog
+    configurePin1_4(GPIO_14in);
+    configurePin1_5(A5);
+    configurePin1_6(UCA0RX);
+    configurePin1_7(UCA0TX);
+    PM5CTL0 &= ~LOCKLPM5;                         // Enable GPIO
+    P1IFG = 0;                                    // Clear to avoid erroneous port interrupts
+    initDcoFrequency();                           // Clock
+    initAdc();                                    // ADC
+    initMicroTimer();                             // Timer B0 for microseconds
+    initMilliTimer();                             // Timer B3 for milliseconds
+    initI2C();                                    // I2C setup
+    initSPI();
+    __enable_interrupt();                         // Enable global interrupts
 
     // Main program loop (to be implemented)        
     while (1) {
