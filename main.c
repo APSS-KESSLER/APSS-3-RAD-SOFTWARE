@@ -181,8 +181,7 @@ typedef enum {
     GPIO_14in,
     GPIO_14out,
     A4,
-    UCA0STE,
-    TCK,
+    UCA0STE
 } pin_state14;
 
 // States for pin 1.5
@@ -190,8 +189,7 @@ typedef enum {
     GPIO_15in,
     GPIO_15out,
     A5,
-    UCA0CLK,
-    TMS
+    UCA0CLK
 } pin_state15;
 
 // States for pin 1.6
@@ -200,8 +198,7 @@ typedef enum {
     GPIO_16out,
     A6,
     UCA0RX,
-    MISO,
-    TDL
+    MISO
 } pin_state16;
 
 // States for pin 1.7
@@ -210,8 +207,7 @@ typedef enum {
     GPIO_17out,
     A7,
     UCA0TX,
-    MOSI,
-    TDO
+    MOSI
 } pin_state17;
 
 void configurePin1_4(unsigned int config){
@@ -252,23 +248,31 @@ void configurePin1_4(unsigned int config){
 
 void configurePin1_5(unsigned int config){
 
+    // Reset all pins in the port
+    P1SEL0 &= ~BIT5;
+    P1SEL1 &= ~BIT5;
+    P1DIR &= ~BIT5;
+    P1REN &= ~BIT5;
+    P1OUT &= ~BIT5;
+
     switch(config){
 
         case GPIO_15in:
-
+            P1DIR &= ~BIT5;     // Configured as input
+            P1REN |= BIT5;      // Enable internal resistor
+            P1OUT |= BIT5;      // Select pullup resistor
 
         case GPIO_15out:       
-  
+            P1DIR |= BIT5;      // Configured as output
+            P1OUT |= BIT5;      // Set output mode to HIGH
 
         case A5:
-
+            P1SEL0 |= BIT5;     // Select Bits for analog function
+            P1SEL1 |= BIT5;
 
         case UCA0CLK:
-
-
-        case TMS:
-
-
+            P1SEL0 |= BIT4;
+            P1SEL1 &= ~BIT4;    
     }
 
 }
@@ -277,20 +281,20 @@ void configurePin1_6(unsigned int config){
 
     switch(config){
 
-        case GPIO_15:
+        case GPIO_16in:
 
 
-        case A5:
+        case GPIO_16out:
+
+
+        case A6:
 
 
         case UCA0RX:
-
+  
 
         case MISO:
-
-
-        case TDL:
-
+  
 
     }
 
@@ -300,7 +304,10 @@ void configurePin1_7(unsigned int config){
 
     switch(config){
 
-        case GPIO_17:
+        case GPIO_17in:
+
+        
+        case GPIO_17out:
 
 
         case A7:
@@ -311,8 +318,6 @@ void configurePin1_7(unsigned int config){
 
         case MOSI:
 
-
-        case TDO:
 
     }
 
