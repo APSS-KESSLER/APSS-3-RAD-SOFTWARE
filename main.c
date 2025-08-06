@@ -310,25 +310,39 @@ void configurePin1_6(unsigned int config){
             P1SEL1 &= ~BIT6;   
 
     }
+}
 
 void configurePin1_7(unsigned int config){
+
+    // Reset all pins in the port
+    P1SEL0 &= ~BIT7;
+    P1SEL1 &= ~BIT7;
+    P1DIR &= ~BIT7;
+    P1REN &= ~BIT7;
+    P1OUT &= ~BIT7;
 
     switch(config){
 
         case GPIO_17in:
-
+            P1DIR &= ~BIT7;     // Configured as input
+            P1REN |= BIT7;      // Enable internal resistor
+            P1OUT |= BIT7;      // Select pullup resistor
         
         case GPIO_17out:
-
+            P1DIR |= BIT7;      // Configured as output
+            P1OUT |= BIT7;      // Set output mode to HIGH
 
         case A7:
-
+            P1SEL0 |= BIT7;     // Select Bits for analog function
+            P1SEL1 |= BIT7;
 
         case UCA0TX:
-
+            P1SEL0 |= BIT7;
+            P1SEL1 &= ~BIT7;   
 
         case MOSI:
-
+            P1SEL0 |= BIT7;
+            P1SEL1 &= ~BIT7;  
 
     }
 
