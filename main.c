@@ -210,6 +210,25 @@ typedef enum {
     MOSI
 } pin_state17;
 
+// Setup Pin 1.2 for I2C data line (SDA) and Pin 1.3 for I2C clock line (SCL)
+void configurePinI2C(){
+
+    // Reset all pins in port
+    P1SEL0 &= ~(BIT2 | BIT3);
+    P1SEL1 &= ~(BIT2 | BIT3);
+    P1DIR  &= ~(BIT2 | BIT3);
+    P1REN  &= ~(BIT2 | BIT3);
+    P1OUT  &= ~(BIT2 | BIT3);
+
+    // Configure P1.2 for UCB0SDA
+    P1SEL0 |= BIT2;
+    P1SEL1 &= ~BIT2;
+
+    // Configure P1.3 for UCB0SCL
+    P1SEL0 |= BIT3;
+    P1SEL1 &= ~BIT3;
+}
+
 void configurePin1_4(unsigned int config){
 
     // Reset all pins in the port
