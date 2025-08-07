@@ -1,7 +1,6 @@
 // **********************************************************
 // *                                                        *
 // *     Author: Chris Lawrence                             *
-// *     Date:   31/07/25                                   *
 // *                                                        *
 // *     Summary: MSP430 Code Adaptation of CosmicWatch     *
 // *                                                        *
@@ -11,43 +10,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "pinConfig.h"
-
-// Time constants
-#define TIMER_1MS_SMCLK               1000              // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
-#define TIMER_1US_SMCLK               1                 // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
-
-
-// I2C constants
-#define SLAVE_ADDR                    0x00              // TODO: Set I2C slave address (placeholder, not yet assigned)
-
-// Command identifiers for Slave device communication
-#define CMD_TYPE_0_SLAVE              0
-#define CMD_TYPE_1_SLAVE              1
-#define CMD_TYPE_2_SLAVE              2
-
-// Command identifiers for Master device communication
-#define CMD_TYPE_0_MASTER             3
-#define CMD_TYPE_1_MASTER             4
-#define CMD_TYPE_2_MASTER             5
-
-// Data lengths for each command type in bytes
-#define TYPE_0_LENGTH                 1
-#define TYPE_1_LENGTH                 2
-#define TYPE_2_LENGTH                 6
-
-#define MAX_BUFFER_SIZE               20                // Will require changing in future once requirements known
-
-// Buffers for data sent between master/slave
-uint8_t MasterType2 [TYPE_2_LENGTH] = {0};
-uint8_t MasterType1 [TYPE_1_LENGTH] = {0};
-uint8_t MasterType0 [TYPE_0_LENGTH] = {0};
-uint8_t SlaveType2 [TYPE_2_LENGTH] = {0};
-uint8_t SlaveType1 [TYPE_1_LENGTH] = {0};
-uint8_t SlaveType0 [TYPE_0_LENGTH] = {0};
-
-// Signal and LED constants
-const int SIGNAL_THRESHOLD = 50;                        // Min threshold to trigger on. See calibration.pdf for conversion to mV
-const int RESET_THRESHOLD = 25;
+#include "spi.h"
+#include "config.h"
 
 // Volatile time variables
 volatile unsigned long interrupt_timer   = 0;   
@@ -77,13 +41,6 @@ uint8_t keep_pulse                       = 0;
 //******************************************************************************
 // Initialisation Functions ****************************************************
 //******************************************************************************
-
-// Function to perform pin setup routine for configuration
-void initPins(){
-
-    
-
-}
 
 // Function to initialise DCO frequency for MCLK and SMCLK clocks
 void initDcoFrequency() {
@@ -143,34 +100,6 @@ void initI2C() {
     UCB0CTLW0 &= ~UCSWRST;                         // clear reset register
     UCB0IE |= UCRXIE + UCSTPIE;
     
-}
-
-// Function to initialise SPI communcation with OBC
-void initSPI(void) {
-    
-    UCB0CTLW0 = UCSWRST;                           // Hold USCI in reset for configuration
-
-    // Configure: 4-wire SPI slave, MSB first
-    UCB0CTLW0 |= UCMSB | UCSYNC | UCMODE_2;        // 4-wire slave setup
-    UCB0CTLW0 |= UCCKPL | UCCKPH;                  // TODO: adjust SPI mode depending on what OBC uses (clock polarity and phase)
-    
-    // Configure pins
-    P1SEL0 |= BIT0 | BIT1 | BIT2 | BIT3;           // P1.0 = STE, P1.1=CLK, P1.2=SOMI, P1.3=SIMO
-    P1SEL1 &= ~(BIT0 | BIT1 | BIT2 | BIT3);
-
-    // Configure STE interrupt to detect transaction end
-    P2DIR &= ~BIT0;                                // STE as input
-    P2REN |= BIT0;                                 // Enable pull-up/down
-    P2IES &= ~BIT0;                                // Rising edge detect (STE going high = transaction end)
-    P2IFG &= ~BIT0;                                // Clear any pending
-    
-    UCB0IFG = 0;                                   // Clear interrupt flags 
-    UCB0TXBUF = 0x00;                              // Dummy byte
-    
-    UCB0CTLW0 &= ~UCSWRST;                         // Release USCI for operation
-    P2IE  |= BIT0;                                 // Enable interrupt for STE pin
-    UCB0IE |= UCRXIE;                              // Enable RX interrupt
-
 }
 
 //******************************************************************************
@@ -270,50 +199,6 @@ int gpioReadPin5(uint8_t pin) {
     return (P5IN & (1 << pin)) ? 1 : 0;
 }
 
-//******************************************************************************
-// SPI State Machine ***********************************************************
-//******************************************************************************
-
-// SPI operation modes for the slave device state machine.
-typedef enum {
-    WAIT_FOR_START,
-    READ_QUERY,
-    READ_SUBQUERY,
-    READ_LENGTH,
-    READ_DATA
-} SPI_PacketState;
-
-// Variables for data transfer
-volatile SPI_PacketState spi_state = WAIT_FOR_START;
-volatile uint8_t spi_rx_buffer[MAX_BUFFER_SIZE];
-volatile uint8_t spi_tx_buffer[MAX_BUFFER_SIZE];
-volatile uint8_t rx_index = 0;
-volatile uint8_t expected_length = 0;
-volatile uint8_t tx_length = 0;
-volatile uint8_t tx_index = 0;
-volatile uint8_t packet_ready = 0;
-
-// ===== Process Packet =====
-void process_spi_packet(uint8_t *packet, uint8_t length) {
-    uint8_t query_code = packet[1];
-    uint8_t sub_code   = packet[2];
-    uint8_t payload_len = packet[3];
-    uint8_t *payload = &packet[4];
-
-    // Build a simple echo response
-    spi_tx_buffer[0] = 0xD8;
-    spi_tx_buffer[1] = query_code | 0x80;  // Response code (echo + 0x80)
-    spi_tx_buffer[2] = 1;                  // Response length
-    spi_tx_buffer[3] = 0xAA;               // Dummy payload
-
-    tx_length = 4;    // Header + payload
-    tx_index = 0;
-}
-
-//******************************************************************************
-// ISR's ***********************************************************************
-//******************************************************************************
-
 // Microsecond ISR
 #pragma vector = TIMER0_B1_VECTOR
 __interrupt void Timer_B_ISR(void) {
@@ -342,100 +227,6 @@ __interrupt void Timer_B_ISR(void) {
 }
 }
 
-// SPI ISR
-#pragma vector = USCI_B0_VECTOR
-__interrupt void USCI_B0_ISR(void) {
-
-    switch(__even_in_range(UCB0IV, USCI_SPI_UCTXIFG)) {
-
-        case USCI_NONE: 
-        break;
-
-        // RX interrupt, new byte being recieved
-        case USCI_SPI_UCRXIFG: {
-
-            // Read byte in RX buffer
-            uint8_t byte = UCB0RXBUF;
-
-            // SPI state machine for assembling incoming packet
-            switch (spi_state) {
-                
-                // Start of new packet: reset index, store start byte, move to next state
-                case WAIT_FOR_START:
-                    if (byte == 0xD8) {  
-                        rx_index = 0;
-                        spi_rx_buffer[rx_index++] = byte;
-                        spi_state = READ_QUERY;
-                    }
-                    break;
-
-                // Store query byte in buffer and advance index
-                case READ_QUERY:
-                    spi_rx_buffer[rx_index++] = byte;
-                    spi_state = READ_SUBQUERY;
-                    break;
-
-                // Store sub-query byte in buffer and advance index
-                case READ_SUBQUERY:
-                    spi_rx_buffer[rx_index++] = byte;
-                    spi_state = READ_LENGTH;
-                    break;
-
-                // Store length byte in buffer and advance index
-                case READ_LENGTH:
-                    spi_rx_buffer[rx_index++] = byte;
-                    expected_length = byte;
-
-                    // Check for a valid length
-                    if (expected_length > MAX_BUFFER_SIZE - 4) {
-                        spi_state = WAIT_FOR_START;
-                    } else if (expected_length == 0) {
-                        packet_ready = 1;
-                        spi_state = WAIT_FOR_START;
-
-                    // If length is valid proceed to reading
-                    } else {
-                        spi_state = READ_DATA;
-                    }
-                    break;
-
-                // Store data byte in buffer and advance index
-                case READ_DATA:
-                    spi_rx_buffer[rx_index++] = byte;
-
-                    // All expected bytes received, packet is now ready for processing
-                    if (--expected_length == 0) {
-                        packet_ready = 1;
-                        spi_state = WAIT_FOR_START;
-                    }
-                    break;
-            }
-
-            // Transmit next response byte, or send dummy byte (0x00) if none left
-            if (tx_index < tx_length) {
-                UCB0TXBUF = spi_tx_buffer[tx_index++];
-            } else {
-                UCB0TXBUF = 0x00;
-            }
-            break;
-        }
-        default: break;
-    }
-}
-
-// STE Pin ISR for resetting at end of transaction
-#pragma vector=PORT1_VECTOR
-__interrupt void PORT1_ISR(void) {
-    if (P1IFG & BIT0) {     
-        if (P1IN & BIT0) { // STE went high (end of transaction)
-            spi_state = WAIT_FOR_START;
-            rx_index = 0;
-            expected_length = 0;
-        }
-        P1IFG &= ~BIT0; // Clear interrupt flag for P1.0
-    }
-}
-
 // Millisecond ISR
 #pragma vector = TIMER3_B0_VECTOR
 __interrupt void TimerB3ISR(void) {
@@ -449,28 +240,25 @@ int main(void){
     
     // Initialise system
     WDTCTL = WDTPW | WDTHOLD;                     // Stop watchdog
-    configurePin1_4(GPIO_14in);
-    configurePin1_5(A5);
-    configurePin1_6(UCA0RX);
-    configurePin1_7(UCA0TX);
+
+    configurePin1_4(GPIO_14in);            // Configure pin 1.4 to GPIO input
+    configurePin1_5(A5);                   // Configure pin 1.5 to Analogue
+    configurePin1_6(UCA0RX);               // Confiugre pin 1.6 to RX
+    configurePin1_7(UCA0TX);               // Configure pin 1.7 t TX
     PM5CTL0 &= ~LOCKLPM5;                         // Enable GPIO
     P1IFG = 0;                                    // Clear to avoid erroneous port interrupts
+
     initDcoFrequency();                           // Clock
     initAdc();                                    // ADC
     initMicroTimer();                             // Timer B0 for microseconds
     initMilliTimer();                             // Timer B3 for milliseconds
     initI2C();                                    // I2C setup
-    initSPI();
+    initSPI();                                    // SPI setup
     __enable_interrupt();                         // Enable global interrupts
 
     // Main program loop (to be implemented)        
     while (1) {
 
-    configurePinI2C();
-    configurePin1_4(GPIO_14out);
-    configurePin1_5(UCA0CLK);
-    configurePin1_6(MISO);
-    configurePin1_7(MOSI);
     
     }
     
