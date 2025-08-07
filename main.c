@@ -10,6 +10,7 @@
 #include <msp430fr2355.h>
 #include <stdint.h>
 #include <stdio.h>
+#include "pinConfig.h"
 
 // Time constants
 #define TIMER_1MS_SMCLK               1000              // At 1 MHz SMCLK, 1 clock cycle = 1 µs → 1000 cycles = 1 ms
@@ -169,201 +170,6 @@ void initSPI(void) {
     UCB0CTLW0 &= ~UCSWRST;                         // Release USCI for operation
     P2IE  |= BIT0;                                 // Enable interrupt for STE pin
     UCB0IE |= UCRXIE;                              // Enable RX interrupt
-
-}
-
-//******************************************************************************
-// Pin Config Functions ********************************************************
-//******************************************************************************
-
-// States for pin 1.4
-typedef enum {
-    GPIO_14in,
-    GPIO_14out,
-    A4,
-    UCA0STE
-} pin_state14;
-
-// States for pin 1.5
-typedef enum {
-    GPIO_15in,
-    GPIO_15out,
-    A5,
-    UCA0CLK
-} pin_state15;
-
-// States for pin 1.6
-typedef enum {
-    GPIO_16in,
-    GPIO_16out,
-    A6,
-    UCA0RX,
-    MISO
-} pin_state16;
-
-// States for pin 1.7
-typedef enum {
-    GPIO_17in,
-    GPIO_17out,
-    A7,
-    UCA0TX,
-    MOSI
-} pin_state17;
-
-// Setup Pin 1.2 for I2C data line (SDA) and Pin 1.3 for I2C clock line (SCL)
-void configurePinI2C(){
-
-    // Reset all pins in port
-    P1SEL0 &= ~(BIT2 | BIT3);
-    P1SEL1 &= ~(BIT2 | BIT3);
-    P1DIR  &= ~(BIT2 | BIT3);
-    P1REN  &= ~(BIT2 | BIT3);
-    P1OUT  &= ~(BIT2 | BIT3);
-
-    // Configure P1.2 for UCB0SDA
-    P1SEL0 |= BIT2;
-    P1SEL1 &= ~BIT2;
-
-    // Configure P1.3 for UCB0SCL
-    P1SEL0 |= BIT3;
-    P1SEL1 &= ~BIT3;
-}
-
-void configurePin1_4(unsigned int config){
-
-    // Reset all pins in the port
-    P1SEL0 &= ~BIT4;
-    P1SEL1 &= ~BIT4;
-    P1DIR &= ~BIT4;
-    P1REN &= ~BIT4;
-    P1OUT &= ~BIT4;
-
-    switch(config){
-
-        case GPIO_14in:
-            P1DIR &= ~BIT4;     // Configured as input
-            P1REN |= BIT4;      // Enable internal resistor
-            P1OUT |= BIT4;      // Select pullup resistor
-            break;
-
-        case GPIO_14out:       
-            P1DIR |= BIT4;      // Configured as output
-            P1OUT |= BIT4;      // Set output mode to HIGH
-            break;
-
-        case A4:
-            P1SEL0 |= BIT4;     // Select Bits for analog function
-            P1SEL1 |= BIT4;
-            break;
-
-        case UCA0STE:
-            P1SEL0 |= BIT4;
-            P1SEL1 &= ~BIT4;    
-            break;
-
-    }
-
-}
-
-void configurePin1_5(unsigned int config){
-
-    // Reset all pins in the port
-    P1SEL0 &= ~BIT5;
-    P1SEL1 &= ~BIT5;
-    P1DIR &= ~BIT5;
-    P1REN &= ~BIT5;
-    P1OUT &= ~BIT5;
-
-    switch(config){
-
-        case GPIO_15in:
-            P1DIR &= ~BIT5;     // Configured as input
-            P1REN |= BIT5;      // Enable internal resistor
-            P1OUT |= BIT5;      // Select pullup resistor
-
-        case GPIO_15out:       
-            P1DIR |= BIT5;      // Configured as output
-            P1OUT |= BIT5;      // Set output mode to HIGH
-
-        case A5:
-            P1SEL0 |= BIT5;     // Select Bits for analog function
-            P1SEL1 |= BIT5;
-
-        case UCA0CLK:
-            P1SEL0 |= BIT5;
-            P1SEL1 &= ~BIT5;    
-    }
-
-}
-
-void configurePin1_6(unsigned int config){
-
-    // Reset all pins in the port
-    P1SEL0 &= ~BIT6;
-    P1SEL1 &= ~BIT6;
-    P1DIR &= ~BIT6;
-    P1REN &= ~BIT6;
-    P1OUT &= ~BIT6;
-
-    switch(config){
-
-        case GPIO_16in:
-            P1DIR &= ~BIT6;     // Configured as input
-            P1REN |= BIT6;      // Enable internal resistor
-            P1OUT |= BIT6;      // Select pullup resistor
-
-        case GPIO_16out:
-            P1DIR |= BIT6;      // Configured as output
-            P1OUT |= BIT6;      // Set output mode to HIGH
-
-        case A6:
-            P1SEL0 |= BIT6;     // Select Bits for analog function
-            P1SEL1 |= BIT6;
-
-        case UCA0RX:
-            P1SEL0 |= BIT6;
-            P1SEL1 &= ~BIT6;   
-
-        case MISO:
-            P1SEL0 |= BIT6;
-            P1SEL1 &= ~BIT6;   
-
-    }
-}
-
-void configurePin1_7(unsigned int config){
-
-    // Reset all pins in the port
-    P1SEL0 &= ~BIT7;
-    P1SEL1 &= ~BIT7;
-    P1DIR &= ~BIT7;
-    P1REN &= ~BIT7;
-    P1OUT &= ~BIT7;
-
-    switch(config){
-
-        case GPIO_17in:
-            P1DIR &= ~BIT7;     // Configured as input
-            P1REN |= BIT7;      // Enable internal resistor
-            P1OUT |= BIT7;      // Select pullup resistor
-        
-        case GPIO_17out:
-            P1DIR |= BIT7;      // Configured as output
-            P1OUT |= BIT7;      // Set output mode to HIGH
-
-        case A7:
-            P1SEL0 |= BIT7;     // Select Bits for analog function
-            P1SEL1 |= BIT7;
-
-        case UCA0TX:
-            P1SEL0 |= BIT7;
-            P1SEL1 &= ~BIT7;   
-
-        case MOSI:
-            P1SEL0 |= BIT7;
-            P1SEL1 &= ~BIT7;  
-
-    }
 
 }
 
@@ -660,7 +466,11 @@ int main(void){
     // Main program loop (to be implemented)        
     while (1) {
 
-        
+    configurePinI2C();
+    configurePin1_4(GPIO_14out);
+    configurePin1_5(UCA0CLK);
+    configurePin1_6(MISO);
+    configurePin1_7(MOSI);
     
     }
     
