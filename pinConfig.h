@@ -1,3 +1,11 @@
+/******************************************************************************
+*
+* Author: Chris Lawrence
+*
+* Summary: Header file for Pin Configuration
+*
+******************************************************************************/
+
 #ifndef PIN_CONFIG_H
 #define PIN_CONFIG_H
 

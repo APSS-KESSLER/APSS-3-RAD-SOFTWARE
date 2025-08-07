@@ -1,6 +1,13 @@
+/******************************************************************************
+*
+* Author: Chris Lawrence
+*
+* Summary: Source file for Pin Configuration
+*
+******************************************************************************/
+
 #include <msp430fr2355.h>
 #include "pinConfig.h"
-
 
 // Setup Pin 1.2 for I2C data line (SDA) and Pin 1.3 for I2C clock line (SCL)
 void configurePinI2C(){
