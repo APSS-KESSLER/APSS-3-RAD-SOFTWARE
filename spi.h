@@ -22,12 +22,12 @@ extern volatile uint8_t tx_index;
 extern volatile uint8_t packet_ready;
 
 // Buffers for data sent between master/slave
-extern uint8_t MasterType2 [TYPE_2_LENGTH] = {0};
-extern uint8_t MasterType1 [TYPE_1_LENGTH] = {0};
-extern uint8_t MasterType0 [TYPE_0_LENGTH] = {0};
-extern uint8_t SlaveType2 [TYPE_2_LENGTH] = {0};
-extern uint8_t SlaveType1 [TYPE_1_LENGTH] = {0};
-extern uint8_t SlaveType0 [TYPE_0_LENGTH] = {0};
+extern uint8_t MasterType2 [TYPE_2_LENGTH];
+extern uint8_t MasterType1 [TYPE_1_LENGTH]; 
+extern uint8_t MasterType0 [TYPE_0_LENGTH]; 
+extern uint8_t SlaveType2 [TYPE_2_LENGTH]; 
+extern uint8_t SlaveType1 [TYPE_1_LENGTH];
+extern uint8_t SlaveType0 [TYPE_0_LENGTH]; 
 
 // SPI operation modes for the slave device state machine.
 typedef enum {

@@ -20,6 +20,13 @@ volatile uint8_t tx_length = 0;
 volatile uint8_t tx_index = 0;
 volatile uint8_t packet_ready = 0;
 
+// Variables for buffers
+uint8_t MasterType2 [TYPE_2_LENGTH] = {0};
+uint8_t MasterType1 [TYPE_1_LENGTH] = {0};
+uint8_t MasterType0 [TYPE_0_LENGTH] = {0};
+uint8_t SlaveType2  [TYPE_2_LENGTH] = {0};
+uint8_t SlaveType1  [TYPE_1_LENGTH] = {0};
+uint8_t SlaveType0  [TYPE_0_LENGTH] = {0};
 
 // Function to initialise SPI communcation with OBC
 void initSPI(void) {
