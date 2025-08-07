@@ -13,31 +13,7 @@
 #include "spi.h"
 #include "config.h"
 #include "i2c.h"
-
-// Volatile time variables
-volatile unsigned long interrupt_timer   = 0;   
-volatile unsigned long total_deadtime    = 0;    
-volatile unsigned long waiting_t1        = 0;           // Timestamp for deadtime calculation
-volatile uint32_t timer_overflows        = 0;           // Overflow counter for microseconds since program start
-
-// Non-volatile time variables
-unsigned long measurement_deadtime       = 0;
-unsigned long measurementT1;
-unsigned long measurementT2;                            // Reserved for future use
-unsigned long time_stamp                 = 0;
-unsigned long start_time                 = 0;           // Reference time for all the time measurements
-
-// Muon variables
-float sipm_voltage                       = 0;
-long int count                           = 0;           // A tally of the number of muon counts observed
-float last_sipm_voltage                  = 0;           // Reserved for future use
-float temperatureC;
-
-// Flags and mode indicators for interrupt handling and device state
-volatile uint8_t waiting_for_interrupt   = 0;
-uint8_t SLAVE;
-uint8_t MASTER;
-uint8_t keep_pulse                       = 0;
+#include "timer.h"
 
 //******************************************************************************
 // Initialisation Functions ****************************************************
@@ -63,22 +39,6 @@ void initDcoFrequency() {
 
 }
 
-// Initialise timer for microsecond counting
-void initMicroTimer() {
-
-    TB0CTL = TBSSEL_2 | MC_2 | TBCLR | TBIE;         // SMCLK, Continuous mode, Clear, Interrupt enable
-
-}
-
-// Initialise timer for millisecond counting
-void initMilliTimer() {
-
-    TB3CCR0 = TIMER_1MS_SMCLK - 1;                  // 1ms interval
-    TB3CCTL0 = CCIE;                                // Enable interrupt for CCR0
-    TB3CTL = TBSSEL_2 | MC_1 | TBCLR;               // use SMCLK, count up to TB3CCR0, and clear timer
-
-}
-
 // Function to initialise ADC
 void initAdc() {
 
@@ -90,34 +50,6 @@ void initAdc() {
     ADCCTL2 = ADCRES_2;                             // 12-bit resolution ** TODO: find appropriate clock frequency for bit resolution **
     ADCMCTL0 = ADCINCH_0;                           // Default to channel 0 (A0)
 
-}
-
-//******************************************************************************
-// Timer Calls *****************************************************************
-//******************************************************************************
-
-// Function to return milliseconds since inception
-// Will overflow after approximately 49.7 days (2^32ms)
-uint32_t millis() {
-    return interrupt_timer;
-}
-
-// Function to get a 32-bit timer count combining timer and overflow count
-// Overflow will occur every 71 minutes @ 1 MHz, Depending on timestamp requirements will need to find way to manage
-uint32_t micros() {
-
-    // Variables to hold successive readings of the overflow counter and timer register
-    uint16_t t1;
-    uint32_t ovf1, ovf2;
-
-    // Loop until consistent readings are obtained, this handles the case where the timer overflows during the read
-    do {
-        ovf1 = timer_overflows;
-        t1 = TB0R;
-        ovf2 = timer_overflows;
-    } while (ovf1 != ovf2);
-
-    return (ovf2 << 16) | t1; // Combine overflow count and timer value
 }
 
 //******************************************************************************
@@ -187,43 +119,6 @@ int gpioReadPin5(uint8_t pin) {
 
     // Read pin
     return (P5IN & (1 << pin)) ? 1 : 0;
-}
-
-// Microsecond ISR
-#pragma vector = TIMER0_B1_VECTOR
-__interrupt void Timer_B_ISR(void) {
-
-    // Switch statements to avoid undefined behaviour for other interrupt flags
-    switch (TB0IV) {
-
-        // Overflow flag case
-        case TBIV__TBIFG:
-
-            timer_overflows++; // Increment microseconds timer
-
-            // Increment system deadtime
-            if (waiting_for_interrupt == 1) {
-                uint32_t current_time = (timer_overflows << 16) | TB0R;
-                total_deadtime += (current_time - waiting_t1);
-            }
-
-            // Reset interrupt flag
-            waiting_for_interrupt = 0;
-            break;
-
-        // Invalid case handling
-        default:
-            break;
-}
-}
-
-// Millisecond ISR
-#pragma vector = TIMER3_B0_VECTOR
-__interrupt void TimerB3ISR(void) {
-
-    // Increment ms counter
-    interrupt_timer++;
-
 }
 
 int main(void){
