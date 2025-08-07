@@ -12,6 +12,7 @@
 #include "pinConfig.h"
 #include "spi.h"
 #include "config.h"
+#include "i2c.h"
 
 // Volatile time variables
 volatile unsigned long interrupt_timer   = 0;   
@@ -89,17 +90,6 @@ void initAdc() {
     ADCCTL2 = ADCRES_2;                             // 12-bit resolution ** TODO: find appropriate clock frequency for bit resolution **
     ADCMCTL0 = ADCINCH_0;                           // Default to channel 0 (A0)
 
-}
-
-// Function to initialise I2C communication
-void initI2C() {
-
-    UCB0CTLW0 = UCSWRST;                           // Software reset enabled
-    UCB0CTLW0 |= UCMODE_3 | UCSYNC;                // I2C mode, sync mode
-    UCB0I2COA0 = SLAVE_ADDR | UCOAEN;              // Own Address and enable
-    UCB0CTLW0 &= ~UCSWRST;                         // clear reset register
-    UCB0IE |= UCRXIE + UCSTPIE;
-    
 }
 
 //******************************************************************************
