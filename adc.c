@@ -81,3 +81,10 @@ __interrupt void ADC_ISR(void) {
             break;
     }
 }
+
+// Timer2 B2 interrupt service routine
+#pragma vector=TIMER0_B0_VECTOR
+__interrupt void TIMER0_B0_ISR(void) {
+  P1OUT ^= BIT0;
+}
+
