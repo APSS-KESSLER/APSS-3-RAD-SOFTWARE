@@ -45,3 +45,39 @@ void initAdc() {
     ADCCTL0 |= ADCENC;                                          // Enable conversion
 
 }
+
+
+// ADC interrupt service routine
+#pragma vector=ADC_VECTOR
+__interrupt void ADC_ISR(void) {
+    switch(__even_in_range(ADCIV,ADCIV_ADCIFG))
+    {
+        case ADCIV_NONE:
+            break;
+        case ADCIV_ADCOVIFG:
+            break;
+        case ADCIV_ADCTOVIFG:
+            break;
+        case ADCIV_ADCHIIFG:                            // ADCHI; A1 > 2V
+            ADCIFG &= ~ADCHIIFG;                        // Clear interrupt flag
+            TB0CTL &= ~MC_1;                            // Turn off Timer
+            TB0CCR0 = FastToggle_Period;                // Set Timer Period for fast LED toggle
+            TB0CTL |= MC_1;                             // Turn on Timer
+            break;
+        case ADCIV_ADCLOIFG:                            // ADCLO; A1 < 0.5V
+            ADCIFG &= ~ADCLOIFG;                        // Clear interrupt flag
+            TB0CTL &= ~MC_1;                            // Turn off Timer
+            TB0CCR0 = SlowToggle_Period;                // Set Timer Period for slow LED toggle
+            TB0CTL |= MC_1;                             // Turn on Timer
+            break;
+        case ADCIV_ADCINIFG:                            // ADCIN; 0.5V < A1 < 2V
+            ADCIFG &= ~ADCINIFG;                        // Clear interrupt flag
+            TB0CTL &= ~MC_1;                            // Turn off Timer
+            P1OUT &= ~BIT0;                             // Turn off LED on P1.0
+            break;
+        case ADCIV_ADCIFG:
+            break;
+        default:
+            break;
+    }
+}
