@@ -10,8 +10,9 @@
 #define ADC_H
 
 // --- CONSTANTS defined using macros ---
-#define maxEventVoltage 2.5 // Todo: figure out what is appropriate
-#define minEventVoltage 2   // Todo: figure out what is appropriate
+// Voltage calculated as (Vin/Vref)*((2^n) - 1)
+#define maxEventVoltage 1638 // ~1V --> Todo: figure out what is appropriate
+#define minEventVoltage 819   // ~0.5V --> Todo: figure out what is appropriate
 #define PWM_PERIOD 8191
 #define DUTY_CYCLE 4095
 
