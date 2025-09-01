@@ -14,8 +14,6 @@
 
 // --- Function Prototypes ---
 void initMicroTimer(void);
-void initMilliTimer(void);
-uint32_t millis(void);
 uint32_t micros(void);
 
 #endif /* TIMERS_H */
