@@ -9,12 +9,17 @@
 #include <msp430fr2355.h>
 #include "adc.h"
 #include <stdint.h>
+#include "timer.h"
 
 // ADC logging variables
 volatile uint8_t consecHigh = 0;
 unsigned int SlowToggle_Period = 20000-1;
 unsigned int FastToggle_Period = 3000-1;
 unsigned int adcResult;                                         // Temporarily stores the ADC value
+
+volatile adcEvent currentEvent = noEvent;
+volatile unsigned long eventTime;
+
 
 // Function to initialise ADC
 void initAdc() {
@@ -46,6 +51,21 @@ void initAdc() {
 
 }
 
+bool adcStillLow(){
+    ADCCTL0 &= ~ADCENC;          // Disable to allow new start
+    ADCCTL0 |= ADCENC;           // Re-enable
+    ADCCTL0 |= ADCSC;            // Start conversions
+    while (ADCCTL1 & ADCBUSY) {}
+    return (ADCMEM0 < ADCLO);              // Read the new result
+}
+
+bool adcStillHigh(){
+    ADCCTL0 &= ~ADCENC;          // Disable to allow new start
+    ADCCTL0 |= ADCENC;           // Re-enable
+    ADCCTL0 |= ADCSC;            // Start conversions
+    while (ADCCTL1 & ADCBUSY) {}
+    return (ADCMEM0 > ADCHI);              // Read the new result
+}
 
 // ADC interrupt service routine
 #pragma vector=ADC_VECTOR
@@ -59,21 +79,16 @@ __interrupt void ADC_ISR(void) {
         case ADCIV_ADCTOVIFG:
             break;
         case ADCIV_ADCHIIFG:                            // ADCHI; A5 > 1V
-            ADCIFG &= ~ADCHIIFG;                        // Clear interrupt flag
-            TB0CTL &= ~MC_1;                            // Turn off Timer
-            TB0CCR0 = FastToggle_Period;                // Set Timer Period for fast LED toggle
-            TB0CTL |= MC_1;                             // Turn on Timer
+            currentEvent = highEvent;
+            ADCIFG &= ~ADCHIIFG;            
             break;
         case ADCIV_ADCLOIFG:                            // ADCLO; A5 < 0.5V
-            ADCIFG &= ~ADCLOIFG;                        // Clear interrupt flag
-            TB0CTL &= ~MC_1;                            // Turn off Timer
-            TB0CCR0 = SlowToggle_Period;                // Set Timer Period for slow LED toggle
-            TB0CTL |= MC_1;                             // Turn on Timer
+            currentEvent = lowEvent;
+            ADCIFG &= ~ADCLOIFG;
             break;
         case ADCIV_ADCINIFG:                            // ADCIN; 0.5V < A5 < 1V
-            ADCIFG &= ~ADCINIFG;                        // Clear interrupt flag
-            TB0CTL &= ~MC_1;                            // Turn off Timer
-            P1OUT &= ~BIT0;                             // Turn off LED on P1.0
+            currentEvent = inEvent;
+            ADCIFG &= ~ADCINIFG;
             break;
         case ADCIV_ADCIFG:
             break;

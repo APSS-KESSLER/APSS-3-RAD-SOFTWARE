@@ -9,6 +9,8 @@
 #ifndef ADC_H
 #define ADC_H
 
+#include <stdbool.h>
+
 // --- CONSTANTS defined using macros ---
 // Voltage calculated as (Vin/Vref)*((2^n) - 1)
 #define maxEventVoltage 1638 // ~1V --> Todo: figure out what is appropriate
@@ -18,5 +20,18 @@
 
 // --- Function Prototypes ---
 void initAdc();
+bool adcStillLow();
+bool adcStillHigh();
+
+
+typedef enum{
+    noEvent,
+    highEvent,
+    inEvent,
+    lowEvent
+} adcEvent;
+
+extern volatile adcEvent currentEvent;
+extern volatile unsigned long eventTime;
 
 #endif

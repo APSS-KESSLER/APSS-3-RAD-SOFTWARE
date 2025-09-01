@@ -9,6 +9,7 @@
 #include <msp430fr2355.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "pinConfig.h"
 #include "spi.h"
 #include "config.h"
@@ -54,16 +55,48 @@ int main(void){
 
     initDcoFrequency();                           // Clock
     initAdc();                                    // ADC
-    initMicroTimer();                             // Timer B0 for microseconds
-    initMilliTimer();                             // Timer B3 for milliseconds
+    initMicroTimer();                             // Timer B1 for microseconds
     initI2C();                                    // I2C setup
     initSPI();                                    // SPI setup
     __enable_interrupt();                         // Enable global interrupts
 
-    // Main program loop (to be implemented)        
+    P1DIR |= BIT0;
+    P1OUT &= ~BIT0;
+
+    P1DIR |= BIT1;
+    P1OUT &= ~BIT1;
+    
     while (1) {
 
-    
+        switch(currentEvent){
+
+            case noEvent:
+            // P1OUT |= BIT1; // Set LED off by default
+            break;
+
+            case highEvent:
+            eventTime = micros();
+            while(micros() - eventTime < 5){}
+            if (adcStillHigh()){
+                P1OUT &= ~BIT1;
+            }
+            currentEvent = noEvent;              
+            break;
+
+            case inEvent:
+            P1OUT |= BIT1;
+            // currentEvent = noEvent;
+            break;
+
+            case lowEvent:
+            eventTime = micros();
+            while(micros() - eventTime < 5){}
+            if (adcStillLow()){
+                P1OUT &= ~BIT1;
+            }
+            currentEvent = noEvent;              
+            break;
+        }
+
     }
-    
 }
