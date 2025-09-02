@@ -36,3 +36,26 @@ void enqueue(int data){
     rear = (rear + 1) % MAX_SIZE;
     queue[rear] = data;
 }
+
+// Function to dequeue (remove) an element
+int dequeue()
+{
+    // If the queue is empty, do not attempt to dequeue
+    if (isEmpty()) {
+        return -1;
+    }
+    // Get the data from the front of the queue
+    int data = queue[front];
+
+    // If the front and rear pointers are at the same
+    // position, reset them
+    if (front == rear) {
+        front = rear = -1;
+    }
+    // Else move the front pointer to the next position
+    else {
+        front = (front + 1) % MAX_SIZE;
+    }
+    // Return the dequeued data
+    return data;
+}
