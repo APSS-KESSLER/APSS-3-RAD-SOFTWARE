@@ -21,3 +21,18 @@ int isFull(){
 int isEmpty(){
     return front == -1;
 }
+
+// Function to enqueue (insert) an element
+void enqueue(int data){
+    // if queue full, do not enqueue
+    if (isFull()) {
+        return;
+    }
+    // If queue empty, set front to first position
+    if (front == -1) {
+        front = 0;
+    }
+    // Add data to queue and move rear pointer
+    rear = (rear + 1) % MAX_SIZE;
+    queue[rear] = data;
+}
