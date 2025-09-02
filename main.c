@@ -16,6 +16,7 @@
 #include "i2c.h"
 #include "timer.h"
 #include "adc.h"
+#include "datalog.h"
 
 //******************************************************************************
 // Initialisation Functions ****************************************************
@@ -57,7 +58,7 @@ int main(void){
     initAdc();                                    // ADC
     initMicroTimer();                             // Timer B1 for microseconds
     initI2C();                                    // I2C setup
-    initSPI();                                    // SPI setup
+    // initSPI();                                    // SPI setup
     __enable_interrupt();                         // Enable global interrupts
 
     P1DIR |= BIT0;
@@ -67,31 +68,33 @@ int main(void){
     P1OUT &= ~BIT1;
     
     while (1) {
-
+        
+        // ADC event handling
         switch(currentEvent){
 
             case noEvent:
-            // P1OUT |= BIT1; // Set LED off by default
+            // To be implemented
             break;
 
             case highEvent:
             eventTime = micros();
             while(micros() - eventTime < 5){}
             if (adcStillHigh()){
+                enqueue(eventTime);
                 P1OUT &= ~BIT1;
             }
             currentEvent = noEvent;              
             break;
 
             case inEvent:
-            P1OUT |= BIT1;
-            // currentEvent = noEvent;
+            // To be implemented
             break;
 
             case lowEvent:
             eventTime = micros();
             while(micros() - eventTime < 5){}
             if (adcStillLow()){
+                enqueue(eventTime);
                 P1OUT &= ~BIT1;
             }
             currentEvent = noEvent;              
