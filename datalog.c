@@ -23,7 +23,7 @@ int isEmpty(){
 }
 
 // Function to enqueue (insert) an element
-void enqueue(int data){
+void enqueue(unsigned long data){
     // if queue full, do not enqueue
     if (isFull()) {
         return;
@@ -38,11 +38,11 @@ void enqueue(int data){
 }
 
 // Function to dequeue (remove) an element
-int dequeue()
+unsigned long dequeue()
 {
     // If the queue is empty, do not attempt to dequeue
     if (isEmpty()) {
-        return -1;
+        return 0;
     }
     // Get the data from the front of the queue
     int data = queue[front];

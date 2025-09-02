@@ -15,7 +15,7 @@
 // Function Prototypes
 int isFull();
 int isEmpty();
-void enqueue(int data);
-int dequeue();
+void enqueue(unsigned long data);
+unsigned long dequeue();
 
 #endif /* DATALOG_H */
