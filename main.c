@@ -17,6 +17,7 @@
 #include "timer.h"
 #include "adc.h"
 #include "datalog.h"
+#include "uart.h"
 
 //******************************************************************************
 // Initialisation Functions ****************************************************
@@ -45,31 +46,29 @@ void initDcoFrequency() {
 int main(void){
     
     // Initialise system
-    WDTCTL = WDTPW | WDTHOLD;                     // Stop watchdog
+    WDTCTL = WDTPW | WDTHOLD;                       // Stop watchdog
 
-    configurePin1_4(GPIO_14in);                   // Configure pin 1.4 to GPIO input
-    configurePin1_5(A5);                          // Configure pin 1.5 to Analogue
-    configurePin1_6(UCA0RX);                      // Confiugre pin 1.6 to RX
-    configurePin1_7(UCA0TX);                      // Configure pin 1.7 to TX
-    PM5CTL0 &= ~LOCKLPM5;                         // Enable GPIO
-    P1IFG = 0;                                    // Clear to avoid erroneous port interrupts
+    configurePin1_4(GPIO_14in);             // Configure pin 1.4 to GPIO input
+    configurePin1_5(A5);                    // Configure pin 1.5 to Analogue
+    configurePin1_6(MISO);                // Confiugre pin 1.6 to RX
+    configurePin1_7(MOSI);                // Configure pin 1.7 to TX
+    PM5CTL0 &= ~LOCKLPM5;                          // Enable GPIO
+    P1IFG = 0;                                     // Clear to avoid erroneous port interrupts
 
     initDcoFrequency();                           // Clock
     initAdc();                                    // ADC
     initMicroTimer();                             // Timer B1 for microseconds
     initI2C();                                    // I2C setup
-    // initSPI();                                    // SPI setup
+    initSPI();                                    // SPI setup
+    initUart();                                   // UART setup
     __enable_interrupt();                         // Enable global interrupts
 
-    P1DIR |= BIT0;
-    P1OUT &= ~BIT0;
+    P6DIR |= BIT6;    // P6.6 as output
+    P6OUT &= ~BIT6;   // LED off initially
 
-    P1DIR |= BIT1;
-    P1OUT &= ~BIT1;
-    
     while (1) {
         
-        // ADC event handling
+        // // ADC event handling
         switch(currentEvent){
 
             case noEvent:
