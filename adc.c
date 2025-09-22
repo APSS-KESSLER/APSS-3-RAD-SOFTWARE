@@ -28,14 +28,14 @@ void initAdc() {
     ADCCTL0 = ADCSHT_2 | ADCON;                                 // sample-and-hold 16 ADCCLK cycles, ADCON
     ADCCTL1 = ADCSHP | ADCSHS_2 | ADCSSEL_1 | ADCCONSEQ_2;      // TB1.1 trigger; ACLK for ADCCLK; Rpt single ch
     ADCCTL2 = ADCRES_2;                                         // 12-bit conversion results
-    ADCMCTL0 = ADCINCH_5 | ADCSREF_1;                           // Vref 2.5v, A5
+    ADCMCTL0 = ADCINCH_5 | ADCSREF_1;                           // Vref 1.5v, A5
     ADCHI = maxEventVoltage;                                    // Window Comparator Hi-threshold
     ADCLO = minEventVoltage;                                    // Window Comparator Lo-threshold
     ADCIE |= ADCHIIE | ADCLOIE | ADCINIE;                       // Enable ADC conv complete interrupt
 
     // Configure Internal reference voltage
     PMMCTL0_H = PMMPW_H;                                        // Unlock the PMM registers
-    PMMCTL2 |= INTREFEN | REFVSEL_2;                            // Enable internal 2.5V reference
+    PMMCTL2 |= INTREFEN | REFVSEL_0;                            // Enable internal 1.5V reference
     __delay_cycles(400);                                 // Delay for reference settling
 
     // Configure TB0 period-timer
