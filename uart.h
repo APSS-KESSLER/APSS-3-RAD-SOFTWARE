@@ -15,7 +15,7 @@
 
 // --- Function Prototypes ---
 void initUart();
-void serialPrintUInt(unsigned int num);
+void serialPrintUInt(uint32_t num);
 void serialPrintChar(char c);
 
 #endif /* UART_H */
