@@ -48,23 +48,25 @@ int main(void){
     // Initialise system
     WDTCTL = WDTPW | WDTHOLD;                       // Stop watchdog
 
-    configurePin1_4(GPIO_14in);             // Configure pin 1.4 to GPIO input
-    configurePin1_5(A5);                    // Configure pin 1.5 to Analogue
-    configurePin1_6(MISO);                // Confiugre pin 1.6 to RX
-    configurePin1_7(MOSI);                // Configure pin 1.7 to TX
-    PM5CTL0 &= ~LOCKLPM5;                          // Enable GPIO
+    configurePin1_4(GPIO_14in);                    // Configure pin 1.4 to GPIO input
+    configurePin1_5(A5);                           // Configure pin 1.5 to Analogue
+    configurePin1_6(MISO);                         // Confiugre pin 1.6 to RX
+    configurePin1_7(MOSI);                         // Configure pin 1.7 to TX
     P1IFG = 0;                                     // Clear to avoid erroneous port interrupts
 
-    initDcoFrequency();                           // Clock
-    initAdc();                                    // ADC
+    initDcoFrequency();                           // Clock setup
+    initAdc();                                    // ADC setup
     initMicroTimer();                             // Timer B1 for microseconds
     initI2C();                                    // I2C setup
-    initSPI();                                    // SPI setup
+    // initSPI();                                    // SPI setup
     initUart();                                   // UART setup
+    initRTC();                                    // RTC setup
     __enable_interrupt();                         // Enable global interrupts
 
-    P6DIR |= BIT6;    // P6.6 as output
-    P6OUT &= ~BIT6;   // LED off initially
+    P6DIR |= BIT6;                                // P6.6 as output
+    P6OUT &= ~BIT6;                               // LED off initially
+    PM5CTL0 &= ~LOCKLPM5;                         // Enable GPIO
+    uint32_t eventTimeLog = 0;
 
     while (1) {
         
@@ -72,17 +74,18 @@ int main(void){
         switch(currentEvent){
 
             case noEvent:
-            // To be implemented
+            P6OUT &= ~BIT6;   // LED off initially
             break;
 
             case highEvent:
             eventTime = micros();
+            eventTimeLog = get_rtc_seconds();
             while(micros() - eventTime < 5){}
             if (adcStillHigh()){
-                enqueue(eventTime);
-                P1OUT &= ~BIT1;
+                enqueue(eventTimeLog);
+                P6OUT &= ~BIT6;
             }
-            currentEvent = noEvent;              
+            currentEvent = noEvent; 
             break;
 
             case inEvent:
@@ -91,12 +94,13 @@ int main(void){
 
             case lowEvent:
             eventTime = micros();
+            eventTimeLog = get_rtc_seconds();
             while(micros() - eventTime < 5){}
             if (adcStillLow()){
-                enqueue(eventTime);
-                P1OUT &= ~BIT1;
+                enqueue(eventTimeLog);
+                P6OUT |= BIT6;
             }
-            currentEvent = noEvent;              
+            currentEvent = noEvent; 
             break;
         }
 
