@@ -13,8 +13,8 @@
 
 // --- CONSTANTS defined using macros ---
 // Voltage calculated as (Vin/Vref)*((2^n) - 1)
-#define maxEventVoltage 655.2 // ~240mV
-#define minEventVoltage 327.6   // ~120mV
+#define maxEventVoltage 655 // ~240mV
+#define minEventVoltage 327   // ~120mV
 #define PWM_PERIOD 8191
 #define DUTY_CYCLE 4095
 

@@ -36,7 +36,7 @@ void initAdc() {
     // Configure Internal reference voltage
     PMMCTL0_H = PMMPW_H;                                        // Unlock the PMM registers
     PMMCTL2 |= INTREFEN | REFVSEL_0;                            // Enable internal 1.5V reference
-    __delay_cycles(400);                                 // Delay for reference settling
+    __delay_cycles(400);                                        // Delay for reference settling
 
     // Configure TB0 period-timer
     TB0CCTL0 = CCIE;                                            // CCR0 interrupt enabled
@@ -78,15 +78,15 @@ __interrupt void ADC_ISR(void) {
             break;
         case ADCIV_ADCTOVIFG:
             break;
-        case ADCIV_ADCHIIFG:                            // ADCHI; A5 > 1V
+        case ADCIV_ADCHIIFG:                            // ADCHI; A5 > 240mV
             currentEvent = highEvent;
             ADCIFG &= ~ADCHIIFG;            
             break;
-        case ADCIV_ADCLOIFG:                            // ADCLO; A5 < 0.5V
+        case ADCIV_ADCLOIFG:                            // ADCLO; A5 < 120mV
             currentEvent = lowEvent;
             ADCIFG &= ~ADCLOIFG;
             break;
-        case ADCIV_ADCINIFG:                            // ADCIN; 0.5V < A5 < 1V
+        case ADCIV_ADCINIFG:                            // ADCIN; 120mV < A5 < 240mV
             currentEvent = inEvent;
             ADCIFG &= ~ADCINIFG;
             break;
