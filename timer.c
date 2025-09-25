@@ -9,6 +9,8 @@
 #include "timer.h"
 #include <msp430fr2355.h>
 
+uint32_t rtc_seconds = 0;
+
 // Initialise timer for microsecond counting
 void initMicroTimer() {
 
@@ -33,6 +35,26 @@ uint32_t micros() {
     return (ovf2 << 16) | t1; // Combine overflow count and timer value
 }
 
+// Initialise RTC for event time
+void initRTC() {
+    RTCCTL = RTCSS__VLOCLK | RTCPS__10 | RTCSR | RTCIE; // VLO Clock (10kHz), divide by 10, clear counter, enable rtc interrupt
+    RTCMOD = 1;                                         // 1 millisecond with 10,000/10=1,000hz clock
+
+}
+
+void reset_rtc_seconds() {
+    rtc_seconds = 0;
+}
+
+void set_rtc_seconds(uint32_t seconds) {
+    rtc_seconds = seconds;
+}
+
+uint32_t get_rtc_seconds(){
+    return rtc_seconds;
+}
+
+
 // Microsecond ISR
 #pragma vector = TIMER3_B1_VECTOR
 __interrupt void Timer_B_ISR(void) {
@@ -51,4 +73,19 @@ __interrupt void Timer_B_ISR(void) {
         default:
             break;
 }
+}
+
+// RTC ISR
+#pragma vector = RTC_VECTOR
+__interrupt void RTC_ISR(void) {
+    switch (__even_in_range(RTCIV, RTCIV_RTCIF))
+    {
+    case RTCIV_NONE:
+        break;
+    case RTCIV_RTCIF:  // RTC Overflow
+        rtc_seconds = rtc_seconds + 1;
+        break;
+    default:
+        break;
+    }
 }

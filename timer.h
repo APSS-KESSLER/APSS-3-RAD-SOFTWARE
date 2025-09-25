@@ -15,5 +15,9 @@
 // --- Function Prototypes ---
 void initMicroTimer(void);
 uint32_t micros(void);
+void initRTC(void);
+void reset_rtc_seconds(void);
+void set_rtc_seconds(uint32_t seconds);
+uint32_t get_rtc_seconds();
 
 #endif /* TIMERS_H */
