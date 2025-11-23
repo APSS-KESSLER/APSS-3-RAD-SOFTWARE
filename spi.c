@@ -289,8 +289,10 @@ void spiStateEvent(uint8_t byte){
             break;
 
             case 0x05: // Read queue size (useful for determining whether to send bin or raw data)
-
+                respData[0] = queueSize;
+                respLen = 1;
             break;
+            
             default:   // Unrecognised Query
                 respData[0] = 0xFF; 
                 respLen = 1; 
