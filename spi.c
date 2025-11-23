@@ -250,7 +250,42 @@ void spiStateEvent(uint8_t byte){
             break;
 
             case 0x04: // Read binned data and send
+            {
+                uint16_t respIndex = 0;
 
+                    while (queueSize > 0) {
+
+                        uint16_t count = (queueSize >= binDataSize) ? binDataSize : queueSize;
+
+                        // First timestamp
+                        uint32_t startTS = dequeue();
+                        uint32_t lastTS = startTS;
+
+                        // Last timestamp
+                        uint16_t z;
+                        for (z = 1; z < count; z++) {
+                            lastTS = dequeue();
+                        }
+
+                        // Start timestamp
+                        respData[respIndex++] = (startTS >> 0) & 0xFF;  // LSB
+                        respData[respIndex++] = (startTS >> 8) & 0xFF;
+                        respData[respIndex++] = (startTS >> 16) & 0xFF;
+                        respData[respIndex++] = (startTS >> 24) & 0xFF; // MSB
+
+                        // End timestamp
+                        respData[respIndex++] = (lastTS >> 0) & 0xFF;   // LSB
+                        respData[respIndex++] = (lastTS >> 8) & 0xFF;
+                        respData[respIndex++] = (lastTS >> 16) & 0xFF;
+                        respData[respIndex++] = (lastTS >> 24) & 0xFF;  // MSB
+
+                        // Event count
+                        respData[respIndex++] = count & 0xFF;           // LSB
+                        respData[respIndex++] = (count >> 8) & 0xFF;    // MSB
+                    }
+
+                    respLen = respIndex;
+                }
             break;
 
             case 0x05: // Read queue size (useful for determining whether to send bin or raw data)
