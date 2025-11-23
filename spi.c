@@ -223,16 +223,19 @@ void spiStateEvent(uint8_t byte){
             break;
 
             case 0x02: // Echo Query
-                    respLen = (lenExpected <= sizeof(respData)) ? lenExpected : sizeof(respData);
-                    uint16_t i;
-                    for (i=0;i<respLen;i++) {
-                        respData[i] = bufferRxData[i];
-                    }
-                break;
+                respLen = (lenExpected <= sizeof(respData)) ? lenExpected : sizeof(respData);
+                uint16_t i;
+                for (i = 0; i < respLen; i++) {
+                    respData[i] = bufferRxData[i];
+                }
+            break;
                 
             case 0x03: // Read data and send
-                // To be implemented
-
+                respLen = queueSize - 1;
+                uint16_t j;
+                for (j = 0; j < respLen; j++) {
+                    respData[i] = dequeue();
+                }
             break;
             default:   // Unrecognised Query
                 respData[0] = 0xFF; 

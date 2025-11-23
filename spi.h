@@ -10,6 +10,7 @@
 #define SPI_H
 #include <stdint.h>
 #include <stdbool.h>
+#include "datalog.h"
 
 // Function prototypes
 void setupSPI_OBC();
