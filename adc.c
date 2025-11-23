@@ -17,7 +17,7 @@ unsigned int SlowToggle_Period = 20000-1;
 unsigned int FastToggle_Period = 3000-1;
 unsigned int adcResult;                                         // Temporarily stores the ADC value
 
-volatile adcEvent currentEvent = noEvent;
+volatile adcEvent currentADCEvent = noEvent;
 volatile unsigned long eventTime;
 
 
@@ -36,7 +36,7 @@ void initAdc() {
     // Configure Internal reference voltage
     PMMCTL0_H = PMMPW_H;                                        // Unlock the PMM registers
     PMMCTL2 |= INTREFEN | REFVSEL_0;                            // Enable internal 1.5V reference
-    __delay_cycles(400);                                        // Delay for reference settling
+    __delay_cycles(400);                                 // Delay for reference settling
 
     // Configure TB0 period-timer
     TB0CCTL0 = CCIE;                                            // CCR0 interrupt enabled
@@ -52,19 +52,19 @@ void initAdc() {
 }
 
 bool adcStillLow(){
-    ADCCTL0 &= ~ADCENC;          // Disable to allow new start
-    ADCCTL0 |= ADCENC;           // Re-enable
-    ADCCTL0 |= ADCSC;            // Start conversions
+    ADCCTL0 &= ~ADCENC;             // Disable to allow new start
+    ADCCTL0 |= ADCENC;              // Re-enable
+    ADCCTL0 |= ADCSC;               // Start conversions
     while (ADCCTL1 & ADCBUSY) {}
-    return (ADCMEM0 < ADCLO);              // Read the new result
+    return (ADCMEM0 < ADCLO);       // Read the new result
 }
 
 bool adcStillHigh(){
-    ADCCTL0 &= ~ADCENC;          // Disable to allow new start
-    ADCCTL0 |= ADCENC;           // Re-enable
-    ADCCTL0 |= ADCSC;            // Start conversions
+    ADCCTL0 &= ~ADCENC;             // Disable to allow new start
+    ADCCTL0 |= ADCENC;              // Re-enable
+    ADCCTL0 |= ADCSC;               // Start conversions
     while (ADCCTL1 & ADCBUSY) {}
-    return (ADCMEM0 > ADCHI);              // Read the new result
+    return (ADCMEM0 > ADCHI);       // Read the new result
 }
 
 // ADC interrupt service routine
@@ -79,15 +79,16 @@ __interrupt void ADC_ISR(void) {
         case ADCIV_ADCTOVIFG:
             break;
         case ADCIV_ADCHIIFG:                            // ADCHI; A5 > 240mV
-            currentEvent = highEvent;
+            currentADCEvent = highEvent;
             ADCIFG &= ~ADCHIIFG;            
+            eventADC = true;
             break;
         case ADCIV_ADCLOIFG:                            // ADCLO; A5 < 120mV
-            currentEvent = lowEvent;
+            currentADCEvent = lowEvent;
             ADCIFG &= ~ADCLOIFG;
             break;
         case ADCIV_ADCINIFG:                            // ADCIN; 120mV < A5 < 240mV
-            currentEvent = inEvent;
+            currentADCEvent = inEvent;
             ADCIFG &= ~ADCINIFG;
             break;
         case ADCIV_ADCIFG:

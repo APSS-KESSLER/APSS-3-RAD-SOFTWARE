@@ -30,8 +30,8 @@ typedef enum{
     inEvent,
     lowEvent
 } adcEvent;
-
-extern volatile adcEvent currentEvent;
+extern volatile bool eventADC;
+extern volatile adcEvent currentADCEvent;
 extern volatile unsigned long eventTime;
 
 #endif
