@@ -43,16 +43,19 @@ void initDcoFrequency() {
 
 }
 
+volatile bool spiEvent;
+volatile bool spiEvent = false;
+
 int main(void){
     
     // Initialise system
-    WDTCTL = WDTPW | WDTHOLD;                       // Stop watchdog
+    WDTCTL = WDTPW | WDTHOLD;                     // Stop watchdog
 
-    configurePin1_4(GPIO_14in);                    // Configure pin 1.4 to GPIO input
-    configurePin1_5(A5);                           // Configure pin 1.5 to Analogue
-    configurePin1_6(MISO);                         // Confiugre pin 1.6 to RX
-    configurePin1_7(MOSI);                         // Configure pin 1.7 to TX
-    P1IFG = 0;                                     // Clear to avoid erroneous port interrupts
+    configurePin1_4(GPIO_14in);            // Configure pin 1.4 to GPIO input
+    configurePin1_5(A5);                   // Configure pin 1.5 to Analogue
+    configurePin1_6(MISO);                 // Confiugre pin 1.6 to RX
+    configurePin1_7(MOSI);                 // Configure pin 1.7 to TX
+    P1IFG = 0;                                    // Clear to avoid erroneous port interrupts
 
     initDcoFrequency();                           // Clock setup
     initAdc();                                    // ADC setup
