@@ -124,8 +124,7 @@ __interrupt void USCI_B0_ISR(void)
     //If the packet hasn't been built (still recieveing data)
     if(!packet_built){
     // Check RX flag
-    if (UCB0IFG & UCRXIFG)
-    {
+    if (UCB0IFG & UCRXIFG) {
         uint8_t in = UCB0RXBUF;
         
         // Push into RX queue
@@ -134,14 +133,14 @@ __interrupt void USCI_B0_ISR(void)
         // Tell main loop new data is available
         spiEvent = true;
     }
-    } else{
-if (UCB0IFG & UCTXIFG){
-            uint8_t t; 
-            if (txq_pop(&t)) {
-                UCB0TXBUF = t;
-            }else{
-                state_reset();
-            }
+    } else {
+    if (UCB0IFG & UCTXIFG) {
+        uint8_t t; 
+        if (txq_pop(&t)) {
+            UCB0TXBUF = t;
+        }else{
+            state_reset();
+        }
         
     }
 }
@@ -177,7 +176,7 @@ void spiStateEvent(uint8_t byte){
             lenExpected = byte;
             state = READ_LENGTH_H;
 
-            break;
+        break;
         case READ_LENGTH_H:
 
             lenExpected |= ((uint16_t)byte) << 8;
@@ -217,130 +216,130 @@ void spiStateEvent(uint8_t byte){
 
         case PREPARE_RESPONSE: {
 
-        uint8_t respData[32];
-        uint16_t respLen = 0;
+            uint8_t respData[32];
+            uint16_t respLen = 0;
 
-        switch (queryCode) {
-            case 0x01: // Acknowledge Query
-                respData[0] = 0xAA; 
-                respLen = 1; 
-            break;
+            switch (queryCode) {
+                case 0x01: // Acknowledge Query
+                    respData[0] = 0xAA; 
+                    respLen = 1; 
+                break;
 
-            case 0x02: // Echo Query
-                respLen = (lenExpected <= sizeof(respData)) ? lenExpected : sizeof(respData);
-                uint16_t i;
-                for (i = 0; i < respLen; i++) {
-                    respData[i] = bufferRxData[i];
-                }
-            break;
-                
-            case 0x03: // Read data and send
-                if (queueSize >= 1) {
-                    respLen = queueSize * 4;                    // Total bytes in buffer
-                    uint16_t j;
-                    for (j = 0; j < queueSize; j++) {
-                        uint32_t val = dequeue();               // Get next uint32 from queue
-
-                        respData[j*4 + 0] = val & 0xFF;         // LSB
-                        respData[j*4 + 1] = (val >> 8) & 0xFF;
-                        respData[j*4 + 2] = (val >> 16) & 0xFF;
-                        respData[j*4 + 3] = (val >> 24) & 0xFF; // MSB
+                case 0x02: // Echo Query
+                    respLen = (lenExpected <= sizeof(respData)) ? lenExpected : sizeof(respData);
+                    uint16_t i;
+                    for (i = 0; i < respLen; i++) {
+                        respData[i] = bufferRxData[i];
                     }
-                }
-            break;
+                break;
+                    
+                case 0x03: // Read data and send
+                    if (queueSize >= 1) {
+                        respLen = queueSize * 4;
+                        uint16_t j;
+                        for (j = 0; j < queueSize; j++) {
+                            uint32_t val = dequeue();
 
-            case 0x04: // Read binned data and send
-            {
-                uint16_t respIndex = 0;
+                            respData[j*4 + 0] = val & 0xFF;         // LSB
+                            respData[j*4 + 1] = (val >> 8) & 0xFF;
+                            respData[j*4 + 2] = (val >> 16) & 0xFF;
+                            respData[j*4 + 3] = (val >> 24) & 0xFF; // MSB
+                        }
+                    }
+                break;
 
-                    while (queueSize > 0) {
+                case 0x04: // Read binned data and send
+                {
+                    uint16_t respIndex = 0;
 
-                        uint16_t count = (queueSize >= binDataSize) ? binDataSize : queueSize;
+                        while (queueSize > 0) {
 
-                        // First timestamp
-                        uint32_t startTS = dequeue();
-                        uint32_t lastTS = startTS;
+                            uint16_t count = (queueSize >= binDataSize) ? binDataSize : queueSize;
 
-                        // Last timestamp
-                        uint16_t z;
-                        for (z = 1; z < count; z++) {
-                            lastTS = dequeue();
+                            // First timestamp
+                            uint32_t startTS = dequeue();
+                            uint32_t lastTS = startTS;
+
+                            // Last timestamp
+                            uint16_t z;
+                            for (z = 1; z < count; z++) {
+                                lastTS = dequeue();
+                            }
+
+                            // Start timestamp
+                            respData[respIndex++] = (startTS >> 0) & 0xFF;  // LSB
+                            respData[respIndex++] = (startTS >> 8) & 0xFF;
+                            respData[respIndex++] = (startTS >> 16) & 0xFF;
+                            respData[respIndex++] = (startTS >> 24) & 0xFF; // MSB
+
+                            // End timestamp
+                            respData[respIndex++] = (lastTS >> 0) & 0xFF;   // LSB
+                            respData[respIndex++] = (lastTS >> 8) & 0xFF;
+                            respData[respIndex++] = (lastTS >> 16) & 0xFF;
+                            respData[respIndex++] = (lastTS >> 24) & 0xFF;  // MSB
+
+                            // Event count
+                            respData[respIndex++] = count & 0xFF;           // LSB
+                            respData[respIndex++] = (count >> 8) & 0xFF;    // MSB
                         }
 
-                        // Start timestamp
-                        respData[respIndex++] = (startTS >> 0) & 0xFF;  // LSB
-                        respData[respIndex++] = (startTS >> 8) & 0xFF;
-                        respData[respIndex++] = (startTS >> 16) & 0xFF;
-                        respData[respIndex++] = (startTS >> 24) & 0xFF; // MSB
-
-                        // End timestamp
-                        respData[respIndex++] = (lastTS >> 0) & 0xFF;   // LSB
-                        respData[respIndex++] = (lastTS >> 8) & 0xFF;
-                        respData[respIndex++] = (lastTS >> 16) & 0xFF;
-                        respData[respIndex++] = (lastTS >> 24) & 0xFF;  // MSB
-
-                        // Event count
-                        respData[respIndex++] = count & 0xFF;           // LSB
-                        respData[respIndex++] = (count >> 8) & 0xFF;    // MSB
+                        respLen = respIndex;
                     }
+                break;
 
-                    respLen = respIndex;
-                }
-            break;
+                case 0x05: // Read queue size (useful for determining whether to send bin or raw data)
+                    respData[0] = queueSize;
+                    respLen = 1;
+                break;
 
-            case 0x05: // Read queue size (useful for determining whether to send bin or raw data)
-                respData[0] = queueSize;
-                respLen = 1;
-            break;
+                default:   // Unrecognised Query
+                    respData[0] = 0xFF; 
+                    respLen = 1; 
+                break;
+            }
+
+            // Build Outgoing Packet
+            static uint8_t packet[4 + 32];         // for now size is predefined, change later?
+            build_packet(packet, respLen, queryCode, respData);
+
+            // Calculate CRC
+            uint16_t crc = crc16(packet, respLen);
+            uint8_t crc_low  = (uint8_t)(crc & 0xFF);
+            uint8_t crc_high = (uint8_t)(crc >> 8);
+
+            // Push Packet onto TX Buffer
+            uint16_t i;
+            for (i = 0; i < (respLen + 4); i++){
+                txq_push(packet[i]);
+            }
+            txq_push(crc_low);
+            txq_push(crc_high);
+
+            // Begin Transmission
+            packet_built = true;
+            //UCB0IE |= UCTXIE; 
             
-            default:   // Unrecognised Query
-                respData[0] = 0xFF; 
-                respLen = 1; 
-            break;
-        }
-
-        // Build Outgoing Packet
-        static uint8_t packet[4 + 32];         // for now size is predefined, change later?
-        build_packet(packet, respLen, queryCode, respData);
-
-        // Calculate CRC
-        uint16_t crc = crc16(packet, respLen);
-        uint8_t crc_low  = (uint8_t)(crc & 0xFF);
-        uint8_t crc_high = (uint8_t)(crc >> 8);
-
-        // Push Packet onto TX Buffer
-        uint16_t i;
-        for (i = 0; i < (respLen + 4); i++){
-            txq_push(packet[i]);
-        }
-        txq_push(crc_low);
-        txq_push(crc_high);
-
-        // Begin Transmission
-        packet_built = true;
-        //UCB0IE |= UCTXIE; 
-        
-        if (UCB0IFG & UCTXIFG){
-            uint8_t t; if (txq_pop(&t)) UCB0TXBUF = t;
-        }
-        state = SEND_RESPONSE;
+            if (UCB0IFG & UCTXIFG){
+                uint8_t t; if (txq_pop(&t)) UCB0TXBUF = t;
+            }
+            state = SEND_RESPONSE;
         
         break;
         }
 
         case SEND_RESPONSE:
 
-        if (txq_empty()){
-            state_reset();
-        }
+            if (txq_empty()){
+                state_reset();
+            }
 
         break;
 
     
         default: 
-        //Should not be here at all
-        P6OUT |= BIT6;
-            break;
+            //Should not be here at all
+            P6OUT |= BIT6;
+        break;
         }
 }
 
