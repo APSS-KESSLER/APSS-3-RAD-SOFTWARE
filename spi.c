@@ -163,6 +163,9 @@ void spiStateEvent(uint8_t byte){
         
         case READ_QUERY:
             queryCode = byte;
+            if(queryCode == 0x04){
+                binData = true;
+            }
             crc_calc = crc16_update(crc_calc, byte);
             state = READ_LENGTH_L;
                     
@@ -171,22 +174,23 @@ void spiStateEvent(uint8_t byte){
         
         case READ_LENGTH_L:
             crc_calc = crc16_update(crc_calc, byte);
-                lenExpected = byte;
+            lenExpected = byte;
             state = READ_LENGTH_H;
 
             break;
         case READ_LENGTH_H:
 
             lenExpected |= ((uint16_t)byte) << 8;
-               crc_calc = crc16_update(crc_calc, byte);
-                state = (lenExpected == 0) ? READ_CRC_L : READ_DATA;
+            crc_calc = crc16_update(crc_calc, byte);
+            state = (lenExpected == 0) ? READ_CRC_L : READ_DATA;
 
             
         break;
         
         case READ_DATA:
             bufferRxData[lenSeen++] = byte;
-           crc_calc = crc16_update(crc_calc, byte);
+            binDataSize = byte;
+            crc_calc = crc16_update(crc_calc, byte);
             if (lenSeen >= lenExpected){
                 state = READ_CRC_L;
             }
@@ -231,11 +235,16 @@ void spiStateEvent(uint8_t byte){
             break;
                 
             case 0x03: // Read data and send
-                if(queueSize >= 1){
-                    respLen = queueSize;
+                if (queueSize >= 1) {
+                    respLen = queueSize * 4;                    // Total bytes in buffer
                     uint16_t j;
-                    for (j = 0; j < respLen; j++) {
-                        respData[j] = dequeue();
+                    for (j = 0; j < queueSize; j++) {
+                        uint32_t val = dequeue();               // Get next uint32 from queue
+
+                        respData[j*4 + 0] = val & 0xFF;         // LSB
+                        respData[j*4 + 1] = (val >> 8) & 0xFF;
+                        respData[j*4 + 2] = (val >> 16) & 0xFF;
+                        respData[j*4 + 3] = (val >> 24) & 0xFF; // MSB
                     }
                 }
             break;
@@ -244,7 +253,7 @@ void spiStateEvent(uint8_t byte){
 
             break;
 
-            case 0x05: // Read queue size (useful for determining whether to bin or send raw data)
+            case 0x05: // Read queue size (useful for determining whether to send bin or raw data)
 
             break;
             default:   // Unrecognised Query
@@ -322,5 +331,6 @@ static void state_reset(){
     crc_received = 0;
     byteIndex = 0;
     packet_built = false;
+    binData = false;
 
 }

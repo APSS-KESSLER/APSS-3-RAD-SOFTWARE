@@ -30,6 +30,8 @@ static volatile uint8_t rx_head = 0;
 static volatile uint8_t rx_tail = 0;
 static volatile uint8_t next = 0;
 extern volatile bool spiEvent;
+bool binData;
+uint8_t binDataSize; 
 
 // TX Buffer Variables
 #define TXQ_SIZE 64
