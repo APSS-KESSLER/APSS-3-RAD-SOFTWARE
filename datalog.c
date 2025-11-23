@@ -9,13 +9,13 @@
 #include "datalog.h"
 
 // Declare the queue array and front, rear variables
-uint32_t queue[MAX_SIZE];
+uint32_t queue[MAX_SIZE_QUEUE];
 int front = -1, rear = -1;
 uint8_t size = 0;
 
 // Function to check if the queue is full
 int isFull(){
-    return (rear + 1) % MAX_SIZE == front;
+    return (rear + 1) % MAX_SIZE_QUEUE == front;
 }
 
 // Function to check if the queue is empty
@@ -34,7 +34,7 @@ void enqueue(uint32_t data){
         front = 0;
     }
     // Add data to queue and move rear pointer
-    rear = (rear + 1) % MAX_SIZE;
+    rear = (rear + 1) % MAX_SIZE_QUEUE;
     queueSize++;
     queue[rear] = data;
 }
@@ -56,7 +56,7 @@ uint32_t dequeue()
     }
     // Else move the front pointer to the next position
     else {
-        front = (front + 1) % MAX_SIZE;
+        front = (front + 1) % MAX_SIZE_QUEUE;
     }
     queueSize--;
     // Return the dequeued data
