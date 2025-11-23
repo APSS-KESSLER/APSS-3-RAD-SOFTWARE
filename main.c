@@ -43,8 +43,26 @@ void initDcoFrequency() {
 
 }
 
-volatile bool spiEvent;
 volatile bool spiEvent = false;
+volatile bool eventADC = false;
+
+// State Control Variables
+typedef enum{
+    Idle,
+    Communicating,
+    ADC
+} eventType;
+eventType currentEvent;
+
+void stateCheck(eventType *currentEvent){
+    if(spiEvent){
+        *currentEvent = Communicating;
+    }else if(eventADC){
+        *currentEvent = ADC;
+    }else{
+        *currentEvent = Idle;
+    }
+}
 
 int main(void){
     
@@ -73,39 +91,51 @@ int main(void){
 
     while (1) {
         
-        // // ADC event handling
         switch(currentEvent){
+            case Idle:
 
-            case noEvent:
-            P6OUT &= ~BIT6;   // LED off initially
+                stateCheck(&currentEvent);
+
             break;
 
-            case highEvent:
-            eventTime = micros();
-            eventTimeLog = get_rtc_seconds();
-            while(micros() - eventTime < 5){}
-            if (adcStillHigh()){
-                enqueue(eventTimeLog);
-                P6OUT &= ~BIT6;
-            }
-            currentEvent = noEvent; 
+            case Communicating:
+                ADCCTL0 &= ~ADCIE;      // Disable ADC interrupts
+                uint8_t b;
+                while (rxq_pop(&b)){
+                    spiStateEvent(b);
+                }
+                spiEvent = false;
+                ADCCTL0 |= ADCIE;      // Enable ADC interrupts
             break;
 
-            case inEvent:
-            // To be implemented
+            case ADC:
+                // ADC event handling
+                switch(currentADCEvent){
+
+                    case noEvent:
+                    P6OUT &= ~BIT6;   // LED off initially
+                    break;
+
+                    case highEvent:
+                    eventTime = micros();
+                    eventTimeLog = get_rtc_seconds();
+                    while(micros() - eventTime < 5){}
+                    if (adcStillHigh()){
+                        enqueue(eventTimeLog);
+                        P6OUT &= ~BIT6;
+                    }
+                    eventADC = false;
+                    currentADCEvent = noEvent; 
+                    break;
+
+                    case inEvent:
+                    break;
+
+                    case lowEvent:
+                    break;
+                }
             break;
 
-            case lowEvent:
-            eventTime = micros();
-            eventTimeLog = get_rtc_seconds();
-            while(micros() - eventTime < 5){}
-            if (adcStillLow()){
-                enqueue(eventTimeLog);
-                P6OUT |= BIT6;
-            }
-            currentEvent = noEvent; 
-            break;
         }
-
     }
 }

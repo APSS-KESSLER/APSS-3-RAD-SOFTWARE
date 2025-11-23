@@ -231,10 +231,7 @@ void spiStateEvent(uint8_t byte){
                 break;
                 
             case 0x03: // Read data and send
-                respLen = 2;
-                extern uint16_t adc_value; // grabs from main.c
-                respData[0] = (uint8_t) (adc_value >> 8);
-                respData[1] = (adc_value & 0xFF);
+                // To be implemented
 
             break;
             default:   // Unrecognised Query
