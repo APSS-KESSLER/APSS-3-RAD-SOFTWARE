@@ -11,6 +11,7 @@
 // Declare the queue array and front, rear variables
 uint32_t queue[MAX_SIZE];
 int front = -1, rear = -1;
+uint8_t size = 0;
 
 // Function to check if the queue is full
 int isFull(){
@@ -34,6 +35,7 @@ void enqueue(uint32_t data){
     }
     // Add data to queue and move rear pointer
     rear = (rear + 1) % MAX_SIZE;
+    queueSize++;
     queue[rear] = data;
 }
 
@@ -56,6 +58,7 @@ uint32_t dequeue()
     else {
         front = (front + 1) % MAX_SIZE;
     }
+    queueSize--;
     // Return the dequeued data
     return data;
 }

@@ -14,6 +14,9 @@
 // --- CONSTANTS ---
 #define MAX_SIZE 100        // Max array size of queue
 
+// --- VARIABLES ---
+uint8_t queueSize;
+
 // Function Prototypes
 int isFull();
 int isEmpty();
