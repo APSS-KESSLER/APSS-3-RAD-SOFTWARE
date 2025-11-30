@@ -64,6 +64,6 @@ static uint16_t lenSeen = 0;
 static uint8_t byteIndex = 0;
 static uint8_t bufferRxData[MAX_SIZE];
 static uint8_t queryCode = 0;
-static volatile bool packet_built=false;
+static volatile bool packet_built = false;
 
 #endif

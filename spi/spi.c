@@ -11,25 +11,25 @@
 
 void setupSPI_OBC(){
        
-    P1SEL0 |= BIT2; // Select P1.2 -> SIMO (Data) GETTING DATA
-    P1SEL1 &= ~BIT2;
+    P1SEL0 |= BIT7; // Select P1.7 -> MOSI (Data) GETTING DATA
+    P1SEL1 &= ~BIT7;
 
     
-    P1SEL0 |= BIT3; // Select P1.3 -> SOMI (Data) SENDING DATA
-    P4SEL1 &= ~BIT3;
+    P1SEL0 |= BIT6; // Select P1.6 -> MISO (Data) SENDING DATA
+    P1SEL1 &= ~BIT6;
 
     
-    P1SEL0 |= BIT1; // Select P1.5 -> CLK (Clock)
-    P1SEL1 &= ~BIT1;
+    P1SEL0 |= BIT5; // Select P1.5 -> CLK (Clock)
+    P1SEL1 &= ~BIT5;
 
-    // STE Pin at 1.0 
-    P1SEL0 |= BIT0;
-    P1SEL1 &= ~BIT0;
+    // STE Pin at 1.4 
+    P1SEL0 |= BIT4;
+    P1SEL1 &= ~BIT4;
 
-    UCB0CTLW0 |= UCSWRST;                         // Hold USCI in reset state
-    UCB0CTLW0 |= UCMSB | UCSYNC |UCCKPH; // MSB First, Synchronous, Clock phase high or something
-    UCB0CTLW0 &= ~UCSWRST;                        // Initialise USCI module
-    UCB0IE |= UCRXIE;                         // Enable USCI_B0 RX interrupt
+    UCA0CTLW0 |= UCSWRST;                         // Hold USCI in reset state
+    UCA0CTLW0 |= UCMSB | UCSYNC |UCCKPH; // MSB First, Synchronous, Clock phase high or something
+    UCA0CTLW0 &= ~UCSWRST;                        // Initialise USCI module
+    UCA0IE |= UCRXIE;                         // Enable USCI_A0 RX interrupt
 
 }
 
@@ -117,15 +117,15 @@ static bool txq_empty(){
     return tx_tail == tx_head; 
 }
 // SPI RX interrupt
-#pragma vector=USCI_B0_VECTOR
-__interrupt void USCI_B0_ISR(void)
+#pragma vector=USCI_A0_VECTOR
+__interrupt void USCI_A0_ISR(void)
 {
 
     //If the packet hasn't been built (still recieveing data)
     if(!packet_built){
     // Check RX flag
-    if (UCB0IFG & UCRXIFG) {
-        uint8_t in = UCB0RXBUF;
+    if (UCA0IFG & UCRXIFG) {
+        uint8_t in = UCA0RXBUF;
         
         // Push into RX queue
         rxq_push(in);
@@ -134,10 +134,10 @@ __interrupt void USCI_B0_ISR(void)
         spiEvent = true;
     }
     } else {
-    if (UCB0IFG & UCTXIFG) {
+    if (UCA0IFG & UCTXIFG) {
         uint8_t t; 
         if (txq_pop(&t)) {
-            UCB0TXBUF = t;
+            UCA0TXBUF = t;
         }else{
             state_reset();
         }
@@ -237,7 +237,7 @@ void spiStateEvent(uint8_t byte){
                     if (queueSize >= 1) {
                         respLen = queueSize * 4;
                         uint16_t j;
-                        for (j = 0; j < queueSize; j++) {
+                        for (j = 0; j < respLen; j++) {
                             uint32_t val = dequeue();
 
                             respData[j*4 + 0] = val & 0xFF;         // LSB
@@ -299,7 +299,7 @@ void spiStateEvent(uint8_t byte){
             }
 
             // Build Outgoing Packet
-            static uint8_t packet[4 + 32];         // for now size is predefined, change later?
+            static uint8_t packet[4 + 256];         // for now size is predefined, change later?
             build_packet(packet, respLen, queryCode, respData);
 
             // Calculate CRC
@@ -317,10 +317,10 @@ void spiStateEvent(uint8_t byte){
 
             // Begin Transmission
             packet_built = true;
-            //UCB0IE |= UCTXIE; 
+            // UCA0IE |= UCTXIE;
             
-            if (UCB0IFG & UCTXIFG){
-                uint8_t t; if (txq_pop(&t)) UCB0TXBUF = t;
+            if (UCA0IFG & UCTXIFG){
+                uint8_t t; if (txq_pop(&t)) UCA0TXBUF = t;
             }
             state = SEND_RESPONSE;
         
@@ -368,5 +368,8 @@ static void state_reset(){
     byteIndex = 0;
     packet_built = false;
     binData = false;
+     if (UCA0IFG & UCTXIFG){
+                UCA0TXBUF = 0xFF;
+            }
 
 }

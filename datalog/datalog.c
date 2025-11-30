@@ -11,7 +11,7 @@
 // Declare the queue array and front, rear variables
 uint32_t queue[MAX_SIZE_QUEUE];
 int front = -1, rear = -1;
-uint8_t size = 0;
+uint8_t queueSize = 0;
 
 // Function to check if the queue is full
 int isFull(){
