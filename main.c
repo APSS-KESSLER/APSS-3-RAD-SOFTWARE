@@ -93,9 +93,7 @@ int main(void){
         
         switch(currentEvent){
             case Idle:
-
                 stateCheck(&currentEvent);
-                currentEvent = Communicating;
             break;
 
             case Communicating:
