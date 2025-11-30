@@ -12,7 +12,10 @@
 #include <stdint.h>
 
 // --- CONSTANTS ---
-#define MAX_SIZE 100        // Max array size of queue
+#define MAX_SIZE_QUEUE 100        // Max array size of queue
+
+// --- VARIABLES ---
+extern uint8_t queueSize;
 
 // Function Prototypes
 int isFull();

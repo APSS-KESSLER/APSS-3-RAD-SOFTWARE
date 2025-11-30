@@ -10,7 +10,7 @@
 #define TIMER_H
 
 #include <stdint.h>
-#include "config.h"
+#include "config/config.h"
 
 // --- Function Prototypes ---
 void initMicroTimer(void);

@@ -9,7 +9,7 @@
 #include <msp430fr2355.h>
 #include "adc.h"
 #include <stdint.h>
-#include "timer.h"
+#include "timer/timer.h"
 
 // ADC logging variables
 volatile uint8_t consecHigh = 0;

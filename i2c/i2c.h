@@ -9,7 +9,7 @@
 #ifndef I2C_H
 #define I2C_H
 
-#include "config.h"
+#include "config/config.h"
 
 // --- Function Prototypes ---
 void initI2C(void);

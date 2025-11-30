@@ -10,8 +10,8 @@
 #define UART_H
 
 #include <stdint.h>
-#include "pinConfig.h"
-#include "config.h"
+#include "pinConfig/pinConfig.h"
+#include "config/config.h"
 
 // --- Function Prototypes ---
 void initUart();

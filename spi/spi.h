@@ -10,6 +10,7 @@
 #define SPI_H
 #include <stdint.h>
 #include <stdbool.h>
+#include "datalog/datalog.h"
 
 // Function prototypes
 void setupSPI_OBC();
@@ -29,6 +30,8 @@ static volatile uint8_t rx_head = 0;
 static volatile uint8_t rx_tail = 0;
 static volatile uint8_t next = 0;
 extern volatile bool spiEvent;
+bool binData;
+uint8_t binDataSize; 
 
 // TX Buffer Variables
 #define TXQ_SIZE 64
@@ -61,6 +64,6 @@ static uint16_t lenSeen = 0;
 static uint8_t byteIndex = 0;
 static uint8_t bufferRxData[MAX_SIZE];
 static uint8_t queryCode = 0;
-static volatile bool packet_built=false;
+static volatile bool packet_built = false;
 
 #endif
