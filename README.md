@@ -29,14 +29,3 @@ OBC is SPI master, RAD payload is slave.
 | SCLK     | P1.5    |
 | STE      | P1.4    |
 
-## Debug SPI Interface (eUSCI_B0)
-
-| Function    | MCU Pin |
-|-------------|----------|
-| SIMO (MOSI) | P1.3     |
-| SOMI (MISO) | P1.2     |
-| SCLK        | P1.1     |
-| STE / CS    | P1.0     |
-
-
-
